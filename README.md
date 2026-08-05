@@ -70,11 +70,11 @@ em vez de vazio silencioso.
 Não há série patrimonial; quem montasse uma concluiria que o patrimônio não
 mudou em cinco anos, achado inteiramente fabricado pela coleta.
 
-**4. O somatório do patrimônio é R$ 32,7 bilhões** — 48× a receita anual. 1.041
-bens (1,5%) carregam 96% disso, imóveis e obras avaliados em centenas de
-milhões, contra mediana de R$ 7.239. Pode ser critério contábil, pode ser erro
-de cadastro. O acervo não escolhe: devolve o total sempre acompanhado da
-concentração.
+**4. O somatório do patrimônio é R$ 32,7 bilhões** — 48× a receita anual. **68
+bens (0,1%) respondem por 60% disso**, imóveis e obras avaliados na casa das
+centenas de milhões, contra mediana de R$ 7.239. Pode ser critério contábil,
+pode ser erro de cadastro. O acervo não escolhe: devolve o total sempre
+acompanhado da concentração.
 
 ## Os relatórios não têm nome de coluna
 

@@ -16,6 +16,18 @@ from typing import Any
 CAMINHO_PADRAO = Path(__file__).resolve().parent.parent / "dados" / "acervo.db"
 
 
+def _reais(valor: float | None) -> str:
+    """Formata em padrão brasileiro. Existe para que a troca de separador
+    alcance só o número, e nunca o texto em volta dele."""
+    if valor is None:
+        return "—"
+    return f"{valor:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+
+def _pct(valor: float, casas: int = 1) -> str:
+    return f"{valor:.{casas}f}".replace(".", ",") + "%"
+
+
 class Acervo:
     def __init__(self, caminho: str | Path | None = None) -> None:
         self.caminho = Path(caminho or os.environ.get("ACERVO_DB") or CAMINHO_PADRAO)
@@ -70,16 +82,21 @@ class Acervo:
                                               "valor_somado": grandes[1]},
                 "coletado_em": pat["em"],
                 "natureza": "fotografia única, não série histórica",
+                # A troca de separador vale SÓ para o número. Aplicá-la à frase
+                # inteira — que foi o que eu fiz na primeira versão — inverte
+                # toda vírgula e todo ponto do texto, e o aviso chega ao
+                # procurador assim: "…centenas de milhões. enquanto a mediana
+                # dos bens é R$ 7.239,00, O somatório supera…". Aviso quebrado
+                # é aviso que ninguém lê.
                 "aviso_sobre_o_total": (
                     f"NÃO cite o valor somado sem esta ressalva: {grandes[0]} bens "
-                    f"({100*grandes[0]/pat['n']:.1f}% do total) respondem por "
-                    f"{100*grandes[1]/pat['valor']:.0f}% do valor — imóveis e obras "
-                    f"de infraestrutura avaliados na casa das centenas de milhões, "
-                    f"enquanto a mediana dos bens é R$ {mediana:,.2f}. O somatório "
-                    f"supera em muitas vezes a receita anual do Município. Pode ser "
-                    f"critério de avaliação, pode ser erro de cadastro: este acervo "
-                    f"não sabe qual, e não deve escolher.".replace(",", "@")
-                    .replace(".", ",").replace("@", ".")),
+                    f"({_pct(100 * grandes[0] / pat['n'])} do total) respondem por "
+                    f"{_pct(100 * grandes[1] / pat['valor'], 0)} do valor — imóveis "
+                    f"e obras de infraestrutura avaliados na casa das centenas de "
+                    f"milhões, enquanto a mediana dos bens é R$ {_reais(mediana)}. "
+                    f"O somatório supera em muitas vezes a receita anual do "
+                    f"Município. Pode ser critério de avaliação, pode ser erro de "
+                    f"cadastro: este acervo não sabe qual, e não deve escolher."),
             },
             "obras": con.execute("SELECT count(*) FROM obra").fetchone()[0],
             "telas_mapeadas_no_portal": con.execute(
