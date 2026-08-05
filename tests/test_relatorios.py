@@ -47,7 +47,17 @@ def test_nenhuma_coluna_ganha_nome(a):
 
 def test_derivados_apontam_a_posicao(a):
     """Derivado sem posição é inconferível: quem lê não consegue voltar à
-    linha crua para checar de onde saiu."""
+    linha crua para checar de onde saiu.
+
+    A comparação de `cnpj_cpf` é por DÍGITOS, não por substring. O derivado é
+    normalizado de propósito — o portal escreve `33683111000107` em contratos e
+    `26.651.036/0001-29` na despesa, e guardar a forma crua deixaria a busca por
+    documento refém de como cada tela resolveu escrever. A primeira versão deste
+    teste comparava substring e passava por sorte: só quebrou quando a amostra
+    caiu numa linha com pontuação.
+    """
+    import re as _re
+
     r = a.pesquisar_relatorios("contrato", limite=20)
     vistos = 0
     for achado in r["achados"]:
@@ -55,8 +65,11 @@ def test_derivados_apontam_a_posicao(a):
             vistos += 1
             assert d["campo"] in {"cnpj_cpf", "data", "url", "valor"}
             assert 0 <= d["posicao"] < len(achado["colunas"])
-            # o valor derivado tem de estar mesmo naquela posição
-            assert d["valor"].strip() in (achado["colunas"][d["posicao"]] or "")
+            crua = achado["colunas"][d["posicao"]] or ""
+            if d["campo"] == "cnpj_cpf":
+                assert d["valor"] == _re.sub(r"\D", "", crua), (d, crua)
+            else:
+                assert d["valor"].strip() in crua, (d, crua)
     assert vistos, "nenhum campo derivado em 20 linhas"
 
 

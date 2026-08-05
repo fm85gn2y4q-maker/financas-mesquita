@@ -28,10 +28,15 @@ COPY financas/ ./financas/
 # instalar_acervo.py com mensagem explícita — de propósito: imagem sem acervo
 # subiria e só falharia na primeira consulta do usuário.
 #
-# Acervo v1.0.0, de 05/08/2026: 126.466 linhas do SICONFI (2013-2026),
-# 71 documentos do PNCP, 69.792 bens de patrimônio, 1.375 telas mapeadas.
-ARG ACERVO=https://github.com/fm85gn2y4q-maker/financas-mesquita/releases/download/v1.0.0/financas-mesquita-v1.0.0.db.gz
-ARG ACERVO_SHA256=75f71e26dbfbcdcf355bf03529d42393b2309efd2900a78a39ef794e980e0da6
+# Acervo v1.1.0 (NÚCLEO), de 05/08/2026: 416.115 linhas em 25 relatórios do
+# portal — inclusive a despesa nota a nota com favorecido e CNPJ —, 126.466 do
+# SICONFI, 71 do PNCP e 69.792 bens de patrimônio.
+#
+# É o núcleo, não o acervo inteiro: com a folha nominal e o programa/projeto/
+# ação o banco vai a 2,8 GB, que não cabe em release nem no disco do plano free.
+# Monte-o com `preparar_nucleo.py` antes de `preparar_release.py`.
+ARG ACERVO=https://github.com/fm85gn2y4q-maker/financas-mesquita/releases/download/v1.1.0/financas-mesquita-v1.1.0.db.gz
+ARG ACERVO_SHA256=5a2c509a1bea0bd0f9627407ecb34b43a2f70a5c3abdbf83fe7a82e8b8143d5e
 COPY instalar_acervo.py ./
 RUN python instalar_acervo.py "$ACERVO" dados/acervo.db "$ACERVO_SHA256"
 

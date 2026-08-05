@@ -18,7 +18,10 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
-BANCO = RAIZ / "dados" / "acervo.db"
+# O que se publica é o NÚCLEO, não o acervo inteiro: 2,8 GB não cabem numa
+# release, e 86% do volume são a folha nominal e o programa/projeto/ação.
+# Monte-o com `preparar_nucleo.py`.
+BANCO = RAIZ / "dados" / "nucleo.db"
 BLOCO = 4 * 1024 * 1024
 
 
@@ -44,14 +47,21 @@ def _numeros(banco: Path) -> str:
         ).fetchone()
         pncp = con.execute("SELECT COUNT(*) FROM pncp_documento").fetchone()[0]
         bens = con.execute("SELECT COUNT(*) FROM patrimonio_bem").fetchone()[0]
+        try:
+            rel, regras = con.execute(
+                "SELECT COUNT(*), COUNT(DISTINCT regra) FROM relatorio_linha"
+            ).fetchone()
+        except sqlite3.OperationalError:
+            rel = regras = 0
         coletas = con.execute(
             "SELECT fonte, MAX(coletado_em) FROM coleta GROUP BY fonte ORDER BY 1"
         ).fetchall()
     finally:
         con.close()
     datas = "; ".join(f"{f} em {d[:10]}" for f, d in coletas)
-    return (f"{siconfi} linhas do SICONFI ({de}-{ate}), {pncp} documentos do "
-            f"PNCP, {bens} bens de patrimônio. Coleta: {datas}")
+    return (f"{rel} linhas em {regras} relatórios do portal, {siconfi} linhas "
+            f"do SICONFI ({de}-{ate}), {pncp} documentos do PNCP, {bens} bens "
+            f"de patrimônio. Coleta: {datas}")
 
 
 def preparar(versao: str,
