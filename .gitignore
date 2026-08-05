@@ -16,3 +16,6 @@ dist/
 
 # Logs de execução dos coletores.
 *.log
+
+# Estado local da automacao: a impressao digital e do que ESTA maquina coletou.
+dados/impressao_digital.json
