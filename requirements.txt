@@ -1,0 +1,7 @@
+# Coleta e ingestão usam só a biblioteca padrão — nada a instalar para elas.
+# Isto é o que o servidor MCP precisa.
+# `mcp` fica pinado abaixo de 2: a 2.x muda a API do FastMCP.
+mcp>=1.28,<2
+pytest>=8.0
+# O plugin pytest do anyio roda os testes que sobem o servidor por stdio.
+anyio>=4.0

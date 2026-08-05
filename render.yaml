@@ -1,0 +1,41 @@
+# Blueprint do Render. Aplicar por Dashboard → Blueprints → New Blueprint.
+#
+# Só declara o que foi verificado. Chave inventada faz o deploy falhar por
+# motivo invisível de fora.
+services:
+  - type: web
+    name: financas-mesquita
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+
+    # `healthCheckPath` fica de fora DE PROPÓSITO, e isto foi medido nos dois
+    # projetos anteriores, que usam o mesmo servidor.
+    #
+    # O Render faz GET no caminho declarado e só considera o serviço saudável
+    # com 2xx/3xx. O endpoint MCP responde:
+    #
+    #     GET  /mcp  → 406 Not Acceptable  ("Client must accept text/event-stream")
+    #     GET  /     → 404
+    #     POST /mcp  → 200
+    #
+    # Não existe caminho que responda 2xx a um GET. Declarar
+    # `healthCheckPath: /mcp` deixaria o serviço eternamente "unhealthy", e o
+    # deploy falharia sem dizer por quê.
+
+    envVars:
+      # Preenchidos DEPOIS do primeiro deploy, quando o endereço público
+      # existir. Sem eles o servidor recusa toda requisição externa com 421 —
+      # é a proteção contra DNS rebinding, e a comparação de Host é exata.
+      - key: FINANCAS_DOMINIOS
+        sync: false
+      # Ativa o fluxo OAuth, que o ChatGPT exige para aceitar um conector.
+      # O Claude conecta sem ele.
+      - key: FINANCAS_URL_PUBLICA
+        sync: false
+      # Sem valor fixo, cada partida do processo sorteia um segredo novo e toda
+      # autorização concedida antes deixa de valer — o que na hospedagem
+      # gratuita, que hiberna por inatividade, significa reautorizar o dia
+      # inteiro.
+      - key: FINANCAS_SEGREDO_OAUTH
+        generateValue: true

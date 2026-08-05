@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+# O cru e o construído ficam fora do Git, como nos outros acervos: o
+# patrimônio sozinho tem 49 MB, e cada coleta somaria outro tanto ao histórico.
+dados_brutos/
+dados/
+
+# Artefatos de empacotamento. `build/mcpb/server/lib` traz as dependências
+# instaladas para três versões de Python — milhares de arquivos, incluindo
+# binários — e `dist/` traz o .mcpb de 63 MB e o .gz do acervo. Nada disso é
+# fonte: é saída, e sai de novo rodando os scripts.
+build/
+dist/

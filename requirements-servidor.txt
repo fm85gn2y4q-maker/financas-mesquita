@@ -1,0 +1,4 @@
+# Só o que a imagem de hospedagem precisa: ela serve o acervo já construído e
+# nunca coleta nem ingere. Coleta e ingestão usam apenas a biblioteca padrão.
+# `mcp` pinado abaixo de 2 — a 2.x muda a API do FastMCP.
+mcp>=1.28,<2
