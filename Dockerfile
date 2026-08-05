@@ -24,11 +24,14 @@ COPY financas/ ./financas/
 # Publicar acervo novo é rodar `python preparar_release.py <versão>`, anexar o
 # .gz à release e trocar estas duas linhas.
 #
-# PREENCHER APÓS A PRIMEIRA RELEASE. Enquanto estiverem vazias, a construção
-# para no instalar_acervo.py com mensagem explícita — de propósito: imagem sem
-# acervo subiria e só falharia na primeira consulta do usuário.
-ARG ACERVO=
-ARG ACERVO_SHA256=
+# Enquanto estas duas linhas estiverem vazias, a construção para no
+# instalar_acervo.py com mensagem explícita — de propósito: imagem sem acervo
+# subiria e só falharia na primeira consulta do usuário.
+#
+# Acervo v1.0.0, de 05/08/2026: 126.466 linhas do SICONFI (2013-2026),
+# 71 documentos do PNCP, 69.792 bens de patrimônio, 1.375 telas mapeadas.
+ARG ACERVO=https://github.com/fm85gn2y4q-maker/financas-mesquita/releases/download/v1.0.0/financas-mesquita-v1.0.0.db.gz
+ARG ACERVO_SHA256=75f71e26dbfbcdcf355bf03529d42393b2309efd2900a78a39ef794e980e0da6
 COPY instalar_acervo.py ./
 RUN python instalar_acervo.py "$ACERVO" dados/acervo.db "$ACERVO_SHA256"
 
