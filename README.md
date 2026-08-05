@@ -18,11 +18,26 @@ Para publicar — extensão, servidor local ou Render —, veja [HOSPEDAGEM.md](
 
 | Tabela | Linhas | Fonte | Alcance |
 |---|---:|---|---|
+| `relatorio_linha` | 2.905.100 | relatórios do portal | 30 relatórios, 2015-2026 |
+| `relatorio_derivado` | 14.127.503 | derivado do conteúdo | CNPJ, data, valor, link |
 | `siconfi_linha` | 126.466 | SICONFI/Tesouro | RREO, RGF e DCA, 2013-2026 |
 | `patrimonio_bem` | 69.792 | API do portal | fotografia única |
 | `portal_tela` | 1.375 | API do portal | mapa de 883 telas |
 | `pncp_documento` | 71 | PNCP | 50 editais, 20 contratos, 1 ata |
 | `obra` | 46 | API do portal | 2021-2025 |
+
+Os relatórios são a exportação **"Dados Abertos"** que o próprio portal oferece
+em cada tela, acionada pela regra que ele usa no botão "Relatório":
+
+    POST /webrun/executeRule.do?action=executeRule&pType=2
+         &ruleName=<regra>&sys=LAI&formID=464569294&P_<n>=7
+      → caminho de WFRReports\Generated\<GUID>.CSV
+      → servido em /ver20240713/WFRReports/Generated/<GUID>.CSV
+
+São 37 regras, mapeadas por `descobrir_relatorios.py` a partir do próprio pacote
+de regras do portal; 30 devolveram dados. Entre elas a **despesa nota a nota**
+com favorecido e CNPJ, receita, contratos, avisos e editais, dispensas, diárias,
+cargos e folha.
 
 ## O risco desta base
 
@@ -61,18 +76,36 @@ milhões, contra mediana de R$ 7.239. Pode ser critério contábil, pode ser err
 de cadastro. O acervo não escolhe: devolve o total sempre acompanhado da
 concentração.
 
+## Os relatórios não têm nome de coluna
+
+Medido nos 115 arquivos coletados: **nenhum traz cabeçalho**, a primeira linha é
+dado, e a largura varia dentro do mesmo relatório — a despesa tem 34 colunas em
+30.685 linhas e 17 em dez.
+
+Sem cabeçalho, nomear coluna por posição é chute, e chute aqui não produz
+lacuna: produz **erro de atribuição**. Uma coluna rotulada "valor" que é outra
+coisa sai bem formatada e passa em qualquer conferência de contagem. Por isso a
+linha é guardada posicional e sem nome, e o servidor diz isso a quem pergunta.
+
+O que se afirma é o que o formato do conteúdo prova — CNPJ, data, valor, link —
+e cada derivado guarda **a posição de onde saiu**, para conferência na linha
+crua. Um teste garante que o valor derivado esteja mesmo naquela posição.
+
+Uma armadilha medida: o portal escreve documento dos dois jeitos, `33683111000107`
+em contratos e `26.651.036/0001-29` na despesa. Exigir dígitos puros derivava
+13.994 documentos em 2,9 milhões de linhas — cego justamente na despesa, que é
+onde está o pagamento. Aceitando as duas formas e guardando só os dígitos, são
+43.293.
+
 ## O que NÃO está aqui
 
-Despesa nota a nota, receita detalhada, folha nominal e contratos com fiscais
-**não foram coletados**. Estão no Portal da Transparência, em telas Softwell
-Maker com CAPTCHA na entrada — que não se contorna. As duas vias legítimas:
+Sete das 37 regras de relatório não respondem sem parâmetro específico e não
+foram coletadas. O Diário Oficial é acervo à parte, com servidor próprio
+(`diarios-mesquita`).
 
-1. A própria tela oferece exportação "Dados Abertos" em CSV, XLS e ODS.
-2. A regra do captcha desvia quando o parâmetro `API` não é nulo: existe modo
-   API para essas telas, e a chave se pede à Subsecretaria de Tecnologia da
-   Informação, ou pelo e-SIC.
-
-O Diário Oficial é acervo à parte, com servidor próprio (`diarios-mesquita`).
+**O captcha não fecha o financeiro** — ele está na *entrada* do formulário de
+Despesas, e a exportação sai por outra rota. Este README afirmou o contrário
+até 05/08/2026.
 
 ## A lacuna do PNCP, medida contra o Diário
 

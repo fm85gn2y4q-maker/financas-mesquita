@@ -13,10 +13,18 @@ def a() -> Acervo:
 
 
 def test_cobertura_declara_o_que_falta(a):
+    """O acervo tem de declarar as ausências, não só o que possui.
+
+    Este teste já exigiu a palavra "captcha", de quando eu supunha que ela
+    fechava o financeiro do portal. Fechava só a ENTRADA do formulário de
+    despesas: a exportação "Dados Abertos" sai por outra rota, sem captcha.
+    O teste falhou quando a afirmação caiu — que é para o que ele serve.
+    """
     c = a.cobertura()
     assert c["siconfi"]["linhas"] > 100_000
-    # O acervo tem de declarar as ausências, não só o que possui.
-    assert any("captcha" in s.lower() for s in c["o_que_NAO_esta_aqui"])
+    faltas = c["o_que_NAO_esta_aqui"]
+    assert faltas, "cobertura sem nenhuma ausência declarada"
+    assert any("diário oficial" in s.lower() for s in faltas), faltas
 
 
 def test_hierarquia_do_siconfi_nao_e_inventada(a):

@@ -98,13 +98,29 @@ TRÊS ARMADILHAS MEDIDAS, QUE PRODUZEM RESPOSTA IMPECÁVEL E ERRADA
    números em `cobertura_do_acervo` e considere que a divulgação no PNCP é
    exigida pela Lei 14.133/2021.
 
+4. **Os relatórios do portal não têm nome de coluna.** Medido nos arquivos
+   coletados: nenhum traz cabeçalho, a primeira linha é dado, e a largura varia
+   dentro do mesmo relatório — a despesa tem 34 colunas em 30.685 linhas e 17
+   em dez. **Nunca rotule uma coluna pela posição.** Uma coluna chamada "valor"
+   que na verdade é outra coisa sai bem formatada, passa em qualquer conferência
+   de contagem e entra numa peça. Cite pelo conteúdo e pela posição — "a 12ª
+   coluna traz 33683111000107" —, e prefira o campo `derivados`, que só contém
+   o que o formato do próprio texto prova: CNPJ/CPF, data, valor e link.
+
+O QUE ESTE ACERVO TEM, E COMO CHEGOU AQUI
+
+Além do SICONFI, do PNCP e do patrimônio, o acervo traz os relatórios que o
+próprio Portal da Transparência exporta na opção "Dados Abertos" — despesa nota
+a nota com favorecido e CNPJ, receita, contratos, avisos e editais, dispensas,
+diárias, cargos e folha. Use `pesquisar_relatorios` para procurar neles e
+`pagamentos_a` para rastrear um favorecido por nome ou documento em todos ao
+mesmo tempo.
+
 O QUE ESTE ACERVO NÃO TEM
 
-Despesa nota a nota (empenho, liquidação, pagamento por favorecido), receita
-detalhada, folha de pagamento nominal e contratos com fiscais **não estão aqui**.
-Existem no Portal da Transparência, em telas protegidas por captcha, e a via de
-acesso é a exportação "Dados Abertos" da própria tela ou o modo API do portal.
-Não encontrar um pagamento aqui não significa que ele não ocorreu.
+O Diário Oficial é outro acervo, com servidor próprio. E sete das 37 regras de
+relatório do portal não respondem sem parâmetro específico — não foram
+coletadas. Não encontrar um pagamento aqui não significa que ele não ocorreu.
 
 Chame `pontos_cegos` antes de concluir que algo não existe.
 """
@@ -196,6 +212,29 @@ def construir(
         return _obter().bens(termo=termo, fornecedor=fornecedor, unidade=unidade,
                              limite=limite)
 
+
+    @mcp.tool()
+    def pesquisar_relatorios(consulta: str, regra: str | None = None,
+                             exercicio: int | None = None,
+                             limite: int = 30) -> dict[str, Any]:
+        """Procura no texto dos relatórios que o portal exporta como "Dados
+        Abertos" — despesa nota a nota, receita, contratos, editais, dispensas,
+        diárias, cargos e folha.
+
+        As linhas voltam SEM nome de coluna, porque o portal não exporta
+        cabeçalho: é um vetor posicional. O campo `derivados` traz o que o
+        formato do conteúdo prova (CNPJ/CPF, data, valor, link), com a posição
+        de onde saiu. `regra` filtra por relatório — veja os nomes em
+        `cobertura_do_acervo`."""
+        return _obter().pesquisar_relatorios(consulta=consulta, regra=regra,
+                                             exercicio=exercicio, limite=limite)
+
+    @mcp.tool()
+    def pagamentos_a(quem: str, limite: int = 40) -> dict[str, Any]:
+        """Rastreia um favorecido em todos os relatórios do portal ao mesmo
+        tempo, por nome ou por CPF/CNPJ. Aceita o documento com ou sem
+        pontuação. Responde "a quem se pagou", que o SICONFI não responde."""
+        return _obter().pagamentos_a(quem, limite=limite)
 
     @mcp.tool()
     def conciliar_fornecedor(nome: str) -> dict[str, Any]:

@@ -13,3 +13,6 @@ dados/
 # fonte: é saída, e sai de novo rodando os scripts.
 build/
 dist/
+
+# Logs de execução dos coletores.
+*.log

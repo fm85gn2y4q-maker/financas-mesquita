@@ -70,4 +70,4 @@ async def test_cobertura_declara_os_limites(parametros):
             c = json.loads((await s.call_tool("cobertura_do_acervo", {})).content[0].text)
             assert c["siconfi"]["linhas"] > 100_000
             assert c["patrimonio"]["aviso_sobre_o_total"]
-            assert any("captcha" in x.lower() for x in c["o_que_NAO_esta_aqui"])
+            assert c["o_que_NAO_esta_aqui"], "nenhuma ausência declarada"
