@@ -45,10 +45,15 @@ from pydantic import AnyHttpUrl, AnyUrl
 
 log = logging.getLogger(__name__)
 
-# Rótulo do escopo anunciado nos metadados de OAuth. Herdado do acervo de
-# jurisprudência quando este módulo foi reaproveitado; aqui o acervo é outro, e
-# o nome aparece para quem inspeciona o conector.
-ESCOPO = "diario-oficial"
+# Rótulo do escopo anunciado nos metadados de OAuth. Aparece na tela de
+# autorização e para quem inspeciona o conector, então tem de dizer a verdade
+# sobre o acervo — este módulo chegou aqui por cópia, e veio com o rótulo do
+# acervo de origem.
+#
+# Trocar este valor invalida as autorizações já concedidas: `required_scopes`
+# entra na conferência do token. Se for mudar depois de alguém já ter conectado,
+# a extensão e o conector precisam ser reautorizados.
+ESCOPO = "financas-mesquita"
 VALIDADE_CODIGO = 300               # 5 min: só atravessa o redirecionamento
 VALIDADE_ACESSO = 60 * 60 * 12      # 12 h
 VALIDADE_ATUALIZACAO = 60 * 60 * 24 * 90
