@@ -284,6 +284,36 @@ class Acervo:
             "SELECT 1 FROM sqlite_master WHERE type='table' "
             "AND name='relatorio_linha'").fetchone())
 
+    def _rotulos(self, regra: str) -> tuple[dict[int, str], dict[int, str]]:
+        """Nomes de coluna conferidos, e as posições que ficaram sem nome de
+        propósito — com o motivo. A segunda metade importa tanto quanto a
+        primeira: sem ela, o silêncio sobre uma coluna vira convite a supor."""
+        if not self.con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' "
+                "AND name='relatorio_coluna'").fetchone():
+            return {}, {}
+        nomes = {r["posicao"]: r["rotulo"] for r in self._linhas(
+            "SELECT posicao, rotulo FROM relatorio_coluna WHERE regra = ?", regra)}
+        indefinidas = {r["posicao"]: r["motivo"] for r in self._linhas(
+            "SELECT posicao, motivo FROM relatorio_coluna_indefinida "
+            "WHERE regra = ?", regra)}
+        return nomes, indefinidas
+
+    def _com_rotulos(self, regra: str, colunas: list[str]) -> list[dict[str, Any]]:
+        nomes, indefinidas = self._rotulos(regra)
+        saida = []
+        for pos, valor in enumerate(colunas):
+            item: dict[str, Any] = {"posicao": pos, "valor": valor}
+            if pos in nomes:
+                item["coluna"] = nomes[pos]
+            elif pos in indefinidas:
+                item["coluna"] = None
+                item["por_que_sem_nome"] = indefinidas[pos]
+            else:
+                item["coluna"] = None
+            saida.append(item)
+        return saida
+
     def relatorios_disponiveis(self) -> list[dict[str, Any]]:
         if not self._tem_relatorios():
             return []
@@ -322,10 +352,11 @@ class Acervo:
             derivados = self._linhas(
                 """SELECT campo, valor, posicao FROM relatorio_derivado
                    WHERE linha_id = ? ORDER BY posicao""", r["id"])
+            colunas = json.loads(r["colunas"])
             achados.append({
                 "regra": r["regra"], "exercicio": r["exercicio"],
                 "linha_no_arquivo": r["ordem"],
-                "colunas": json.loads(r["colunas"]),
+                "campos": self._com_rotulos(r["regra"], colunas),
                 "derivados": derivados,
                 "coletado_em": r["coletado_em"],
             })
@@ -333,12 +364,15 @@ class Acervo:
             "consulta": consulta,
             "achados": achados,
             "como_ler": (
-                "As colunas vêm SEM NOME: o portal não exporta cabeçalho, e "
-                "nomeá-las por posição seria chute. Cite pelo conteúdo e pela "
-                "posição ('a 12ª coluna traz 33683111000107'), nunca invente o "
-                "rótulo. Os itens em `derivados` são os que o formato do "
-                "próprio texto prova — CNPJ/CPF, data, valor e link — e trazem "
-                "a posição de onde saíram, para conferência na linha crua."),
+                "O portal não exporta cabeçalho. Onde `coluna` vem preenchido, "
+                "o nome foi conferido contra o perfil de conteúdo da coluna e "
+                "contra o formulário da própria tela — pode ser citado. Onde "
+                "vem nulo, a coluna NÃO tem nome conhecido: cite pelo conteúdo "
+                "e pela posição, nunca invente o rótulo. Quando houver "
+                "`por_que_sem_nome`, ali está a razão de não se ter decidido — "
+                "em geral duas colunas com a mesma forma e sem como separá-las. "
+                "Os itens em `derivados` são os que o formato do próprio texto "
+                "prova, com a posição de onde saíram."),
         }
 
     def pagamentos_a(self, quem: str, limite: int = 40) -> dict[str, Any]:
@@ -359,7 +393,8 @@ class Acervo:
         return {
             "procurado": quem,
             "por_documento": [{"regra": r["regra"], "exercicio": r["exercicio"],
-                               "colunas": json.loads(r["colunas"]),
+                               "campos": self._com_rotulos(r["regra"],
+                                                           json.loads(r["colunas"])),
                                "coletado_em": r["coletado_em"]}
                               for r in por_documento],
             "por_texto": texto.get("achados", []),

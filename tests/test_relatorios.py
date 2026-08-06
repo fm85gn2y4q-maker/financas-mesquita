@@ -33,16 +33,32 @@ def test_cobertura_lista_os_relatorios(a):
         assert r["coletado_em"] and r["coletado_em"] != "desconhecido"
 
 
-def test_nenhuma_coluna_ganha_nome(a):
-    """A regra central destes relatórios: o portal não exporta cabeçalho, e
-    inventar rótulo por posição produz erro de atribuição, não lacuna."""
+def test_coluna_so_ganha_nome_se_foi_conferida(a):
+    """O portal não exporta cabeçalho. Rótulo só aparece onde foi conferido
+    contra o perfil de conteúdo e o formulário da tela; no resto, `coluna` vem
+    nula — nunca preenchida por dedução de posição."""
     r = a.pesquisar_relatorios("contrato", limite=5)
     assert r["achados"], "busca não achou nada"
     for achado in r["achados"]:
-        assert isinstance(achado["colunas"], list)
-        # colunas é vetor posicional — nunca um dicionário com rótulos
-        assert not isinstance(achado["colunas"], dict)
-    assert "SEM NOME" in r["como_ler"]
+        campos = achado["campos"]
+        assert isinstance(campos, list)
+        for c in campos:
+            assert "posicao" in c and "valor" in c and "coluna" in c
+            assert c["coluna"] is None or isinstance(c["coluna"], str)
+    assert "nunca invente o rótulo" in r["como_ler"]
+
+
+def test_coluna_sem_nome_explica_por_que(a):
+    """Silêncio sobre uma coluna é convite a supor. Onde a decisão foi tomada
+    de não nomear, o motivo tem de vir junto."""
+    r = a.pesquisar_relatorios("medicamentos", regra="consulta_despesa", limite=1)
+    if not r["achados"]:
+        pytest.skip("relatório de despesa não está neste acervo")
+    campos = r["achados"][0]["campos"]
+    nomeadas = [c for c in campos if c["coluna"]]
+    explicadas = [c for c in campos if not c["coluna"] and c.get("por_que_sem_nome")]
+    assert nomeadas, "nenhuma coluna nomeada na despesa"
+    assert explicadas, "nenhuma coluna sem nome traz o motivo"
 
 
 def test_derivados_apontam_a_posicao(a):
@@ -61,11 +77,12 @@ def test_derivados_apontam_a_posicao(a):
     r = a.pesquisar_relatorios("contrato", limite=20)
     vistos = 0
     for achado in r["achados"]:
+        valores = [c["valor"] for c in achado["campos"]]
         for d in achado["derivados"]:
             vistos += 1
             assert d["campo"] in {"cnpj_cpf", "data", "url", "valor"}
-            assert 0 <= d["posicao"] < len(achado["colunas"])
-            crua = achado["colunas"][d["posicao"]] or ""
+            assert 0 <= d["posicao"] < len(valores)
+            crua = valores[d["posicao"]] or ""
             if d["campo"] == "cnpj_cpf":
                 assert d["valor"] == _re.sub(r"\D", "", crua), (d, crua)
             else:
@@ -79,7 +96,8 @@ def test_pagamentos_por_documento_e_por_texto(a):
     assert r["procurado"]
     assert "por_documento" in r and "por_texto" in r
     for item in r["por_documento"]:
-        assert isinstance(item["colunas"], list)
+        assert isinstance(item["campos"], list)
+        assert all("posicao" in c and "coluna" in c for c in item["campos"])
 
 
 def test_pontos_cegos_declara_a_falta_de_cabecalho(a):

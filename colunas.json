@@ -1,0 +1,73 @@
+{
+  "_leia_isto": [
+    "Mapeamento posição → rótulo dos relatórios do portal, que não exporta cabeçalho.",
+    "Cada rótulo aqui é sustentado por DUAS evidências independentes: o perfil de",
+    "conteúdo da coluna (perfilar_colunas.py) e os nomes de campo do formulário de",
+    "detalhe da própria tela do portal. Onde as duas não bastam para decidir, a",
+    "posição fica FORA deste arquivo e continua sem nome no acervo.",
+    "As ausências são deliberadas. Ver `_nao_determinado` em cada relatório."
+  ],
+
+  "url_relatorio_consulta_despesa": {
+    "_fonte": "perfil de 4.000 linhas + campos do formulário 500001085 (Consulta Despesa)",
+    "_nao_determinado": {
+      "3": "data — não sei se é empenho, liquidação ou pagamento; há duas datas e o formulário tem três",
+      "4": "data — idem",
+      "6": "valor — idêntico ao da posição 13 em toda a amostra; o formulário tem valor_despesa, valor_despesa_total, valor_liquidado e valor_pago_liquido, e não dá para dizer qual é qual",
+      "13": "valor — idem",
+      "8": "inteiro de 3 dígitos, 575 distintos — pode ser nº de empenho ou de OP",
+      "22": "inteiro, 1.472 distintos — idem",
+      "12": "sempre vazio nesta coleta"
+    },
+    "colunas": {
+      "0":  "CPF/CNPJ do favorecido",
+      "1":  "Nome do favorecido",
+      "2":  "Exercício",
+      "5":  "Histórico da despesa",
+      "7":  "Dotação orçamentária",
+      "9":  "Fonte de recurso",
+      "10": "Natureza da despesa (código e descrição)",
+      "11": "Estornado?",
+      "14": "Unidade orçamentária",
+      "15": "Subfunção",
+      "16": "Função",
+      "17": "Tipo de pessoa (F/J)",
+      "18": "Mês",
+      "19": "Órgão",
+      "20": "Processo administrativo",
+      "21": "Modalidade de licitação",
+      "23": "Atualizado em",
+      "24": "Secretaria",
+      "25": "Número da licitação",
+      "26": "Categoria econômica",
+      "27": "Elemento de despesa (código)",
+      "28": "Elemento de despesa (descrição)",
+      "29": "Categoria econômica (código)",
+      "30": "Grupo de despesa (descrição)",
+      "31": "Grupo de despesa (código)",
+      "32": "Programa",
+      "33": "Ação"
+    }
+  },
+
+  "url_relatorio_contratos": {
+    "_fonte": "perfil de 4.000 linhas + cabeçalhos do PDF do mesmo relatório",
+    "_nao_determinado": {
+      "2": "data — o PDF traz assinatura, início, vencimento e publicação; quatro datas para quatro posições, e o casamento por valor não as separa",
+      "3": "data — idem",
+      "4": "data — idem",
+      "5": "data — idem"
+    },
+    "colunas": {
+      "0":  "Número da compra",
+      "1":  "Número do processo",
+      "6":  "CPF/CNPJ do contratado",
+      "7":  "Contratado",
+      "8":  "Modalidade de licitação",
+      "9":  "Tipo de documento",
+      "10": "Objeto",
+      "11": "Valor",
+      "12": "Espécie"
+    }
+  }
+}
