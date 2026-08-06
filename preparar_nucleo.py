@@ -28,8 +28,15 @@ NUCLEO = RAIZ / "dados" / "nucleo.db"
 FORA = ("%servidoresxbrutoxliquido%", "%programa_projeto%")
 
 # Tabelas copiadas inteiras.
+#
+# `relatorio_coluna` e `relatorio_coluna_indefinida` PRECISAM estar aqui.
+# Medido: sem elas, reconstruir o núcleo derruba os 36 rótulos para zero — o
+# esquema é recriado vazio, e o acervo publicado sai sem nome de coluna nenhum.
+# Ninguém notaria, porque a ferramenta simplesmente devolve `coluna: null` em
+# tudo, que é a mesma resposta de quando o rótulo de fato não é conhecido.
 INTEIRAS = ("coleta", "siconfi_linha", "pncp_documento", "patrimonio_bem",
-            "obra", "portal_tela")
+            "obra", "portal_tela",
+            "relatorio_coluna", "relatorio_coluna_indefinida")
 
 
 def main() -> None:

@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import date, datetime
@@ -60,9 +61,11 @@ def anotar(mensagem: str) -> None:
         fh.write(linha + "\n")
 
 
-def rodar(comando: list[str], cwd: Path = RAIZ) -> tuple[int, str]:
+def rodar(comando: list[str], cwd: Path = RAIZ,
+          extra: dict[str, str] | None = None) -> tuple[int, str]:
+    ambiente = {**os.environ, **extra} if extra else None
     r = subprocess.run(comando, cwd=cwd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+                       encoding="utf-8", errors="replace", env=ambiente)
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
@@ -178,10 +181,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     anotar("houve mudança; reconstruindo o acervo…")
-    for nome, comando in [("acervo", [PYTHON, "construir_acervo.py"]),
-                          ("relatórios", [PYTHON, "ingerir_relatorios.py"]),
-                          ("núcleo", [PYTHON, "preparar_nucleo.py"])]:
-        codigo, saida = rodar(comando)
+    # `carregar_colunas` entra DUAS vezes, e as duas são necessárias:
+    # `preparar_nucleo` monta o núcleo copiando do acervo completo, e a tabela
+    # de rótulos não sobrevive à cópia. Sem a segunda chamada, o acervo que vai
+    # para a release sai sem nome de coluna nenhum — e ninguém notaria, porque
+    # a ferramenta simplesmente devolve `coluna: null` em tudo.
+    no_nucleo = {"ACERVO_DB": str(NUCLEO)}
+    for nome, comando, ambiente in [
+            ("acervo", [PYTHON, "construir_acervo.py"], None),
+            ("relatórios", [PYTHON, "ingerir_relatorios.py"], None),
+            ("rótulos", [PYTHON, "carregar_colunas.py"], None),
+            ("núcleo", [PYTHON, "preparar_nucleo.py"], None),
+            ("rótulos no núcleo", [PYTHON, "carregar_colunas.py"], no_nucleo)]:
+        codigo, saida = rodar(comando, extra=ambiente)
         if codigo != 0:
             cauda = " / ".join(saida.strip().splitlines()[-3:])
             anotar(f"FALHOU ao montar {nome} ({codigo}): {cauda}")
