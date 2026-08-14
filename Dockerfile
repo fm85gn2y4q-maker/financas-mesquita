@@ -36,8 +36,8 @@ COPY financas/ ./financas/
 # É o núcleo, não o acervo inteiro: com a folha nominal e o programa/projeto/
 # ação o banco vai a 2,8 GB, que não cabe em release nem no disco do plano free.
 # Monte-o com `preparar_nucleo.py` antes de `preparar_release.py`.
-ARG ACERVO=https://github.com/fm85gn2y4q-maker/financas-mesquita/releases/download/v1.2.0/financas-mesquita-v1.2.0.db.gz
-ARG ACERVO_SHA256=b3c21bacb6adddc21675dff1f9fba4799621cc1dfe9e653f716e4f6716fae35b
+ARG ACERVO=https://github.com/fm85gn2y4q-maker/financas-mesquita/releases/download/v2026.08.14/financas-mesquita-v2026.08.14.db.gz
+ARG ACERVO_SHA256=ad486c6e73190c3d3c57c92804736b03bae57ece10cb8606c92882c3ed13760b
 COPY instalar_acervo.py ./
 RUN python instalar_acervo.py "$ACERVO" dados/acervo.db "$ACERVO_SHA256"
 
