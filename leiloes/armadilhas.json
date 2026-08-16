@@ -1,0 +1,57 @@
+[
+  {
+    "id": "replica",
+    "quando": {
+      "texto_contem": ["replica", "réplica", "reproducao", "reproduc", "copia",
+                       "fantasia", "eletrotipo", "electrotipo", "souvenir",
+                       "banhada", "banhado", "folheada", "folheado"]
+    },
+    "desarmada_por": [],
+    "motivo": "A descrição usa vocabulário de peça que não é original (réplica, reprodução, cópia, fantasia, banhada). Uma reprodução não é comparável com a peça que ela reproduz, por mais que traga o mesmo ano e a mesma denominação. Sem original, não há assimetria a explorar — há armadilha.",
+    "confirmar": "Regra própria deste acervo, não de catálogo. Se uma casa usar 'banhada' para descrever pátina de peça original, retire o termo desta lista."
+  },
+  {
+    "id": "1913-duas-series",
+    "quando": {
+      "ano": 1913,
+      "especie": "moeda"
+    },
+    "desarmada_por": ["estrela", "comemorativ", "serie a", "série a", "serie b",
+                      "série b"],
+    "motivo": "Em 1913 o Brasil cunhou duas séries distintas de moedas, correntemente chamadas 'Estrelas' e 'Comemorativa' (ou séries A e B). Elas têm liquidez e faixa de preço próprias, e o martelo de uma NÃO serve de comparável para a outra. A descrição não traz o discriminante.",
+    "confirmar": "CONFERIR no catálogo antes de confiar. A distinção é corrente no mercado brasileiro, mas as denominações exatas que a alcançam devem ser conferidas contra Bentes/Amato e escritas em 'denominacao_em' para estreitar a regra."
+  },
+  {
+    "id": "selo-novo-sem-estado-de-goma",
+    "quando": {
+      "especie": "selo",
+      "texto_contem": ["novo", "nao circulado", "não circulado", "mint"]
+    },
+    "desarmada_por": ["sem charneira", "com charneira", "charneira", "mnh", "nn",
+                      "goma integra", "goma íntegra", "goma original", "sem goma",
+                      "regomado", "n/n"],
+    "motivo": "Em selo novo, o estado da goma é o que define o preço: sem charneira, com charneira e regomado são três mercadorias com faixas muito distintas, e os catálogos cotam cada uma à parte. A descrição diz 'novo' sem dizer qual.",
+    "confirmar": "Regra de mercado filatélico, corrente. Ajuste os termos de desarme conforme o vocabulário das casas que você acompanha."
+  },
+  {
+    "id": "cedula-sem-assinaturas",
+    "quando": {
+      "especie": "cédula"
+    },
+    "desarmada_por": ["assinatura", "assinaturas", "autoridade", "autoridades",
+                      "estampa", "serie", "série"],
+    "motivo": "Em cédula brasileira, a mesma estampa e o mesmo valor mudam de faixa conforme o par de assinaturas e a série — é o que separa a nota comum da nota escassa. A descrição não traz nenhum dos dois.",
+    "confirmar": "Regra de mercado, corrente. Confira contra o catálogo de cédulas que você usa e ajuste os termos de desarme."
+  },
+  {
+    "id": "olho-de-boi-sem-qualificacao",
+    "quando": {
+      "especie": "selo",
+      "texto_contem": ["olho de boi", "olho-de-boi", "inclinados", "bissect"]
+    },
+    "desarmada_por": ["certificado", "parecer", "perito", "peritagem", "margens",
+                      "reimpressao", "reimpressão", "autentic"],
+    "motivo": "As primeiras emissões brasileiras (Olho de Boi, Inclinados, Bissetados) são o alvo preferido de reimpressão e falsificação, e o preço depende de margens, carimbo e, sobretudo, de parecer de perito. Sem qualificação nenhuma no texto, a peça não está identificada — está apenas nomeada.",
+    "confirmar": "Regra própria deste acervo, conservadora de propósito: nestas emissões o custo de errar é maior que o de perder a oportunidade."
+  }
+]

@@ -144,3 +144,103 @@ um contrato lá não prova que ele não exista.
 Duas armadilhas de acesso: a API documentada `/api/consulta/v1/` responde 504 de
 forma crônica, e a que funciona (`/api/search/`) **ignora o filtro por CNPJ** e
 devolve 200 com o Brasil inteiro. O coletor aborta se aparecer órgão de fora.
+
+---
+
+# Acervo de leilões de numismática e filatelia
+
+Segundo acervo deste repositório, independente do financeiro: rastreia o portal
+**LeilõesBR** (`leiloesbr.com.br`) e as casas que anunciam nele, identifica a
+peça de cada lote e mede a distância entre o lance pedido num lote aberto e o
+que peças iguais arremataram no mesmo portal.
+
+    python descobrir_leiloesbr.py --leilao <id>   # mede a estrutura real do portal
+    python coletar_leiloesbr.py                   # varre o catálogo, grava o cru
+    python construir_leiloes.py                   # dados_brutos/ → dados/leiloes.db
+    python -m pytest tests/test_leiloes.py tests/test_coletor_leiloes.py
+    python -m leiloes                             # servidor MCP (stdio)
+
+## O que ele mede, e o que não mede
+
+Mede uma coisa só: **mercado observado**. A referência de preço é o martelo
+deste portal — nenhum catálogo foi ingerido, e nenhum preço vem de outra fonte.
+
+Não mede autenticidade, e é bom que fique dito antes de qualquer número: o
+acervo lê a descrição que o vendedor escreveu. Peça descrita como genuína e que
+não é produz a **melhor** oportunidade da lista, porque o lance está baixo
+justamente por isso.
+
+## O risco desta base
+
+No acervo financeiro o risco é a divergência entre fontes. Aqui é a
+**identificação**. O lote é descrito em texto livre por quem quer vendê-lo, e
+"1000 Réis 1913, prata, Soberba" parece identificação completa e não é: em 1913
+foram cunhadas duas séries distintas, com faixas de preço próprias.
+
+Por isso vale aqui a mesma regra do `nivel='indefinido'` do SICONFI: **onde a
+descrição não determina a peça, o vínculo não é presumido**. O lote sai em
+`identificacao_indefinida`, com o motivo e com os termos que resolveriam a
+dúvida, e o motor se recusa a pontuá-lo. Um lote sem nota é recuperável; um lote
+com nota errada é o que faz alguém dar lance.
+
+## Quatro armadilhas medidas
+
+**1. O martelo não é o custo.** Quem arremata paga comissão do leiloeiro (5%,
+art. 24 do Decreto 21.981/1932, para bens móveis), a taxa administrativa da
+casa, frete e seguro. A conta soma tudo em `custo_total_de_arremate` — comparar
+lance contra martelo alheio sem isso infla toda margem em dois dígitos.
+
+**2. Estado é produto, não adjetivo.** A mesma moeda em MBC e em FC são
+mercadorias distintas. A chave do comparável inclui o estado, e **não há
+conversão entre graus** neste acervo: o multiplicador de MBC para FC não é
+constante entre peças, e um multiplicador médio faria a nota parecer precisa
+exatamente onde seria chute. Selo não usa a escala da moeda — usa o estado da
+goma, e medir selo com FC/S/MBC é aplicar a régua de outro mercado.
+
+**3. O lote não vendido é informação, não ausência.** Peça que não arrematou por
+R$ 800 diz que o mercado não pagou 800 naquele dia. Sai em `nao_arrematados`,
+como teto observado, sem entrar na mediana.
+
+**4. Poucos comparáveis não são comparáveis.** Abaixo de `n_minimo` (5) o acervo
+recusa a nota e diz por quê, em vez de devolver mediana de dois martelos com
+cara de estatística. A mediana resiste ao martelo fora da curva; a média não.
+
+## Onde mora a assimetria
+
+A margem diz quanto se ganha; `por_que_pode_estar_esquecido` diz por que a
+oportunidade ainda estaria de pé às vésperas do pregão — descrição curta, sem
+código de catálogo, sem foto, último quarto do pregão, e **grafia divergente**:
+o lote escrito "Reís" ou "Cruzeriro" não aparece na busca de ninguém e chega ao
+martelo com meia dúzia de olhos em cima. Os dois saem separados de propósito:
+misturá-los num número só daria a um palpite sobre visibilidade a mesma
+aparência que um martelo observado tem.
+
+A consulta mais útil para caçar peça esquecida é `lotes_para_ler` — os lotes que
+a máquina **não** conseguiu classificar são os mesmos que não aparecem em filtro
+nenhum do portal.
+
+## A variável que você tem de medir
+
+`fracao_revendedor` é o que o seu comprador paga sobre o preço de mercado. O
+padrão de 0,50 é chute conservador, ninguém publica esse número, e ele move a
+lista inteira: passar de 0,50 para 0,30 costuma zerá-la. Meça a sua contra os
+negócios que você de fato fizer.
+
+## Coleta
+
+Lenta de propósito: 2,5 s entre requisições (`LEILOES_ESPERA`), User-Agent
+identificável com contato (`LEILOES_CONTATO`) e `robots.txt` conferido antes de
+varrer. Não é escrúpulo — é a diferença entre ter e não ter o acervo no mês que
+vem.
+
+A extração é por **rótulo visível** ("Lance inicial:", "Arrematado por:"), não
+por seletor de HTML: site ASP dessa geração reescreve a marcação sem aviso, e
+seletor posicional quebra calado. E `coletar_leiloesbr.py` aborta quando mais de
+60% dos lotes saem sem preço — isso não é catálogo pobre, é padrão que não casa,
+e coleta que grava lixo é pior que coleta que falha.
+
+> **Estado dos padrões de extração.** Foram escritos **sem acesso ao portal** —
+> o ambiente onde nasceram tem a saída de rede bloqueada para `leiloesbr.com.br`.
+> São hipótese sobre a marcação, não medição dela. Rode
+> `descobrir_leiloesbr.py` numa máquina que alcance o portal **antes** da
+> primeira varredura: ele diz, padrão por padrão, qual casou e qual não.
