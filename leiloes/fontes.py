@@ -50,6 +50,55 @@ BUSCA_ABERTOS = "busca_andamento.asp"
 BUSCA_POS = "buscapos.asp"
 BUSCA_GERAL = "busca.asp"
 
+# Há um segundo portal, com as mesmas rotas: `prime.leiloesbr.com.br`. Não é
+# espelho — tem catálogo próprio. Fica declarado para quem for coletá-lo; este
+# acervo ainda não o varre, e dizer isso é melhor que deixar a ausência passar
+# por inexistência.
+PORTAL_PRIME = "https://prime.leiloesbr.com.br"
+
+# O painel administrativo do portal (`/painel_lbr/`) NÃO é coletado, em
+# hipótese alguma: é área de login de terceiro, e nada do que este acervo faz
+# precisa dela.
+NAO_COLETAR = ("/painel_lbr/", "/admin", "/login")
+
+# CATEGORIAS DO PORTAL, colhidas de endereços públicos indexados do próprio
+# site e decodificadas do parâmetro `tp`. É lista OBSERVADA, não exaustiva —
+# `descobrir_leiloesbr.py` é quem manda, porque lê a página de hoje.
+#
+# A armadilha está no formato, e ela é cara: **"Numismática" sozinha não é
+# categoria**. O portal só usa a forma "Numismática - <subcategoria>", e nome
+# que não existe não dá erro — devolve busca vazia, que passa por "não há peça
+# nesta categoria". Foi exatamente o que este acervo teria feito antes de
+# medir.
+CATEGORIAS_OBSERVADAS: dict[str, tuple[str, ...]] = {
+    "numismatica": (
+        "Numismática - Moedas",
+        "Numismática - Moedas do Brasil",
+        "Numismática - Moedas Estrangeiras",
+        "Numismática - Moeda Romana",
+        "Numismática - Cédulas",
+        "Numismática - Cédulas Brasileiras",
+        "Numismática - Cédulas Estrangeiras",
+        "Numismática - Medalhas",
+    ),
+    "filatelia": (
+        "Filatelia",
+    ),
+}
+
+
+def categorias_do_segmento(segmento: str) -> tuple[str, ...]:
+    """As subcategorias de um segmento. Sem isto, varrer numismática exigiria
+    saber de cor oito nomes exatos — e errar um deles não avisa."""
+    chave = segmento.strip().lower().replace("á", "a").replace("í", "i")
+    if chave not in CATEGORIAS_OBSERVADAS:
+        raise SystemExit(
+            f"Segmento {segmento!r} desconhecido. Há: "
+            f"{', '.join(CATEGORIAS_OBSERVADAS)}.\n"
+            f"Para uma categoria avulsa use --categoria com o nome EXATO do "
+            f"portal, que `descobrir_leiloesbr.py` lista.")
+    return CATEGORIAS_OBSERVADAS[chave]
+
 
 def categoria_hex(nome: str) -> str:
     """Nome de categoria → o valor que o portal espera no parâmetro `tp`.

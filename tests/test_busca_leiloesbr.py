@@ -45,6 +45,65 @@ def test_a_categoria_e_hexadecimal_em_cp1252():
     assert fontes.categoria_hex("Numismática") == "|4E756D69736DE174696361|"
 
 
+def test_o_codificador_reproduz_os_enderecos_do_proprio_portal():
+    """A única validação de verdade que este acervo tem contra o site.
+
+    Cada par abaixo foi colhido de endereço PÚBLICO INDEXADO do LeilõesBR — o
+    hexadecimal veio do site, e o nome é o título da página. Se o codificador
+    reproduz o hexadecimal a partir do nome, ele fala a língua do portal.
+    """
+    do_portal = {
+        "Numismática - Moedas": "4E756D69736DE174696361202D204D6F65646173",
+        "Numismática - Moedas do Brasil":
+            "4E756D69736DE174696361202D204D6F6564617320646F2042726173696C",
+        "Numismática - Moedas Estrangeiras":
+            "4E756D69736DE174696361202D204D6F656461732045737472616E676569726173",
+        "Numismática - Moeda Romana":
+            "4E756D69736DE174696361202D204D6F65646120526F6D616E61",
+        "Numismática - Cédulas": "4E756D69736DE174696361202D2043E964756C6173",
+        "Numismática - Cédulas Brasileiras":
+            "4E756D69736DE174696361202D2043E964756C61732042726173696C6569726173",
+        "Filatelia": "46696C6174656C6961",
+        "Cinema": "43696E656D61",
+        "Memorabilia & Efêmera": "4D656D6F726162696C69612026204566EA6D657261",
+    }
+    for nome, hexa in do_portal.items():
+        assert fontes.categoria_hex(nome) == f"|{hexa}|", nome
+
+
+def test_numismatica_sozinha_nao_e_categoria_do_portal():
+    """A armadilha medida: o portal só usa "Numismática - <sub>". Pedir
+    "Numismática" devolve busca VAZIA, que passa por "não há peça na
+    categoria" — e não por "a categoria não existe"."""
+    assert "Numismática" not in fontes.CATEGORIAS_OBSERVADAS["numismatica"]
+    assert all(c.startswith("Numismática - ")
+               for c in fontes.CATEGORIAS_OBSERVADAS["numismatica"])
+
+
+def test_o_segmento_expande_para_todas_as_subcategorias():
+    """Sem isto, varrer numismática exigiria saber de cor oito nomes exatos."""
+    assert len(fontes.categorias_do_segmento("numismatica")) == 8
+    assert fontes.categorias_do_segmento("numismática") == \
+        fontes.categorias_do_segmento("numismatica")
+    assert fontes.categorias_do_segmento("filatelia") == ("Filatelia",)
+
+
+def test_segmento_desconhecido_diz_quais_existem():
+    import pytest as _pytest
+
+    with _pytest.raises(SystemExit) as erro:
+        fontes.categorias_do_segmento("mobiliário")
+    assert "numismatica" in str(erro.value)
+
+
+def test_a_galeria_e_a_uf_vao_em_texto_e_nao_em_hexadecimal():
+    """Medido: o portal traz `default.asp?ga=Brasil+Moedas+Leilões` e `uf=*`.
+    Codificar `ga` como se fosse `tp` devolveria busca vazia."""
+    url = url_de_busca(fontes.BUSCA_ABERTOS, uf="RJ", galeria="Brasil Moedas")
+    assert "uf=RJ" in url
+    assert "ga=Brasil+Moedas" in url
+
+
 def test_a_url_de_busca_leva_a_categoria_codificada():
     url = url_de_busca(fontes.BUSCA_ABERTOS, categoria="Filatelia")
     assert "busca_andamento.asp" in url

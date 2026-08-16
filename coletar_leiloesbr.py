@@ -263,24 +263,40 @@ def analisar_busca(html: str, situacao: str) -> list[dict[str, Any]]:
 
 
 def url_de_busca(endpoint: str, pesquisa: str = "", categoria: str | None = None,
-                 pagina: int = 1) -> str:
-    parametros = {"pesquisa": pesquisa, "gbl": "0", "b": "0", "pag": pagina,
-                  "tp": fontes.categoria_hex(categoria) if categoria else "|"}
+                 pagina: int = 1, uf: str | None = None,
+                 galeria: str | None = None) -> str:
+    """Monta o endereço da busca.
+
+    `tp` vai em hexadecimal cp1252; `ga` (a galeria) e `uf` vão em texto
+    simples — medido em endereços públicos do portal, que trazem
+    `default.asp?ga=Brasil+Moedas+Leilões` e `busca_andamento.asp?uf=*`.
+    Codificar `ga` como se fosse `tp` devolveria busca vazia.
+    """
+    parametros: dict[str, Any] = {
+        "pesquisa": pesquisa, "gbl": "0", "b": "0", "pag": pagina,
+        "tp": fontes.categoria_hex(categoria) if categoria else "|"}
+    if uf:
+        parametros["uf"] = uf
+    if galeria:
+        parametros["ga"] = galeria
     return f"{fontes.PORTAL}/{endpoint}?{urlencode(parametros)}"
 
 
 def coletar_busca(endpoint: str, situacao: str, pesquisa: str = "",
-                  categoria: str | None = None,
-                  paginas: int = PAGINAS_PADRAO) -> list[dict[str, Any]]:
+                  categoria: str | None = None, paginas: int = PAGINAS_PADRAO,
+                  uf: str | None = None) -> list[dict[str, Any]]:
     """Percorre a busca paginada até acabar. Grava o cru de cada página."""
     lotes: list[dict[str, Any]] = []
     vistos: set[str] = set()
+    esgotou = False
+    rotulo = re.sub(r"\W+", "-", categoria or "tudo").strip("-").lower()
 
     for pagina in range(1, paginas + 1):
-        url = url_de_busca(endpoint, pesquisa, categoria, pagina)
+        url = url_de_busca(endpoint, pesquisa, categoria, pagina, uf)
         bruto = fontes.baixar(url)
         fontes.gravar_bruto(
-            "leiloesbr", f"busca-{endpoint.split('.')[0]}-{pagina:04d}.html",
+            "leiloesbr",
+            f"busca-{endpoint.split('.')[0]}-{rotulo}-{pagina:04d}.html",
             bruto, url)
 
         achados = analisar_busca(fontes.texto(bruto), situacao)
@@ -296,10 +312,22 @@ def coletar_busca(endpoint: str, situacao: str, pesquisa: str = "",
         # esta guarda, a varredura repete a última página até o teto, parecendo
         # que está coletando.
         if not achados:
+            esgotou = True
             break
         if not novos:
             print("  a página repetiu o que já veio — fim do resultado")
+            esgotou = True
             break
+
+    # Teto batido não pode passar em silêncio. Uma subcategoria do portal
+    # chega a milhares de peças — "Numismática - Moedas do Brasil" aparecia com
+    # 4.529 num endereço indexado —, e uma varredura truncada tem exatamente a
+    # mesma aparência de uma completa. Cobertura parcial não declarada vira
+    # conclusão errada sobre o mercado.
+    if not esgotou:
+        print(f"  AVISO: parou no teto de {paginas} páginas SEM esgotar o "
+              f"resultado. O que veio é recorte, não a categoria inteira — "
+              f"suba --paginas para varrer o resto.")
 
     return lotes
 
@@ -352,41 +380,43 @@ def _gravar(nome: str, leilao: dict[str, Any], lotes: list[dict[str, Any]],
     return len(lotes)
 
 
-def coletar(rotas: list[str], pesquisa: str = "", categoria: str | None = None,
-            leiloes: list[str] | None = None,
-            paginas: int = PAGINAS_PADRAO) -> None:
+def coletar(rotas: list[str], pesquisa: str = "",
+            categorias: list[str] | None = None,
+            leiloes: list[str] | None = None, paginas: int = PAGINAS_PADRAO,
+            uf: str | None = None) -> None:
     destino = Path(fontes.BRUTOS) / "leiloesbr"
     destino.mkdir(parents=True, exist_ok=True)
     total = vazios = 0
+    # Sem categoria, varre tudo; o `None` da lista é o "sem filtro".
+    alvos: list[str | None] = list(categorias) if categorias else [None]
 
-    if "abertos" in rotas:
-        print(f"Busca em leilões em andamento"
-              f"{f' — categoria {categoria}' if categoria else ''}"
-              f"{f' — termo {pesquisa!r}' if pesquisa else ''}")
-        lotes = coletar_busca(fontes.BUSCA_ABERTOS, "aberto", pesquisa,
-                              categoria, paginas)
-        # A busca devolve peças de MUITOS leilões, e a página de resultado não
-        # diz de qual casa é cada uma. Declarar isso é melhor que inventar: a
-        # casa fica nomeada como desconhecida até que a ficha do lote a informe.
-        total += _gravar("busca-abertos", {
-            "id": "busca-abertos", "casa": "(casa não identificada na busca)",
-            "casa_site": None, "titulo": "Busca — leilões em andamento",
-            "data_pregao": None,
-            "url": url_de_busca(fontes.BUSCA_ABERTOS, pesquisa, categoria),
-            "cidade": None, "uf": None}, lotes, destino)
-        vazios += sum(1 for l in lotes if l["lance_inicial"] is None)
-
-    if "pos" in rotas:
-        print("Busca em venda pós-pregão")
-        lotes = coletar_busca(fontes.BUSCA_POS, "pos_pregao", pesquisa or "*",
-                              categoria, paginas)
-        total += _gravar("busca-pos-pregao", {
-            "id": "busca-pos-pregao", "casa": "(casa não identificada na busca)",
-            "casa_site": None, "titulo": "Busca — venda pós-pregão",
-            "data_pregao": None,
-            "url": url_de_busca(fontes.BUSCA_POS, pesquisa or "*", categoria),
-            "cidade": None, "uf": None}, lotes, destino)
-        vazios += sum(1 for l in lotes if l["lance_inicial"] is None)
+    for rota, endpoint, situacao, termo in (
+            ("abertos", fontes.BUSCA_ABERTOS, "aberto", pesquisa),
+            ("pos", fontes.BUSCA_POS, "pos_pregao", pesquisa or "*")):
+        if rota not in rotas:
+            continue
+        for categoria in alvos:
+            print(f"{'Leilões em andamento' if rota == 'abertos' else 'Venda pós-pregão'}"
+                  f"{f' — {categoria}' if categoria else ''}"
+                  f"{f' — {uf}' if uf else ''}"
+                  f"{f' — termo {termo!r}' if termo and termo != '*' else ''}")
+            lotes = coletar_busca(endpoint, situacao, termo, categoria,
+                                  paginas, uf)
+            if not lotes:
+                continue
+            # A busca devolve peças de MUITOS leilões, e a página de resultado
+            # não diz de qual casa é cada uma. Declarar isso é melhor que
+            # inventar: a casa fica nomeada como desconhecida até que a ficha
+            # do lote a informe.
+            nome = re.sub(r"\W+", "-", f"{rota}-{categoria or 'tudo'}").strip("-").lower()
+            total += _gravar(f"busca-{nome}", {
+                "id": f"busca-{nome}",
+                "casa": "(casa não identificada na busca)", "casa_site": None,
+                "titulo": f"Busca — {categoria or 'todas as categorias'}",
+                "data_pregao": None,
+                "url": url_de_busca(endpoint, termo, categoria, uf=uf),
+                "cidade": None, "uf": uf}, lotes, destino)
+            vazios += sum(1 for l in lotes if l["lance_inicial"] is None)
 
     if "historico" in rotas or leiloes:
         if not leiloes:
@@ -443,8 +473,14 @@ if __name__ == "__main__":
     parser.add_argument("--historico", action="store_true",
                         help="varre o catálogo para colher martelos passados, "
                              "que são a base de comparação")
-    parser.add_argument("--categoria", help="nome da categoria do portal, "
-                                            "ex.: Numismática, Filatelia")
+    parser.add_argument("--segmento", help="varre TODAS as subcategorias do "
+                                           "segmento: numismatica ou filatelia")
+    parser.add_argument("--categoria", action="append", dest="categorias",
+                        help="nome EXATO de uma categoria do portal, ex.: "
+                             "'Numismática - Moedas do Brasil'. Pode repetir. "
+                             "Cuidado: 'Numismática' sozinha NÃO existe, e "
+                             "nome inexistente devolve busca vazia sem avisar.")
+    parser.add_argument("--uf", help="sigla do estado, para filtrar a busca")
     parser.add_argument("--busca", default="", help="termo de pesquisa")
     parser.add_argument("--leilao", action="append", dest="leiloes",
                         help="id de um leilão; pode repetir")
@@ -456,4 +492,9 @@ if __name__ == "__main__":
                                  ("historico", args.historico)) if ligada]
     if not rotas and not args.leiloes:
         rotas = ["abertos"]
-    coletar(rotas, args.busca, args.categoria, args.leiloes, args.paginas)
+
+    categorias = list(args.categorias or [])
+    if args.segmento:
+        categorias += [c for c in fontes.categorias_do_segmento(args.segmento)
+                       if c not in categorias]
+    coletar(rotas, args.busca, categorias, args.leiloes, args.paginas, args.uf)

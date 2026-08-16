@@ -246,12 +246,24 @@ sinalizado — é peça que o mercado já recusou uma vez, e o vendedor sabe dis
 **A categoria é o nome em hexadecimal cp1252.** Medido nos endereços públicos
 do portal: `tp=|43696E656D61|` é "Cinema", e o `ê` de "Memorabilia & Efêmera"
 aparece como `EA` — um byte, não os dois do UTF-8. Errar a codificação não dá
-erro: devolve busca vazia, que passa por "não há peça nesta categoria". Daí
-`categoria_hex()`, e daí `descobrir_leiloesbr.py` **decodificar as categorias
-reais do portal** em vez de deixar você adivinhar o nome exato.
+erro: devolve busca vazia, que passa por "não há peça nesta categoria".
 
-    python coletar_leiloesbr.py --abertos --categoria Numismática
-    python coletar_leiloesbr.py --pos --categoria Filatelia
+E o nome tem de ser exato. **"Numismática" sozinha NÃO é categoria do portal**
+— ele só usa a forma `Numismática - <subcategoria>`, e são oito delas. Os nomes
+foram colhidos de endereços públicos indexados do próprio site e conferidos
+byte a byte contra o hexadecimal que o portal publica; `descobrir_leiloesbr.py`
+relê a lista da página de hoje, que é quem manda.
+
+    python coletar_leiloesbr.py --abertos --segmento numismatica   # as 8 de uma vez
+    python coletar_leiloesbr.py --pos --segmento filatelia
+    python coletar_leiloesbr.py --abertos --categoria "Numismática - Cédulas Brasileiras"
+    python coletar_leiloesbr.py --abertos --segmento numismatica --uf RJ
+
+O volume não é pequeno: um endereço indexado mostrava **4.529 peças** só em
+"Numismática - Moedas do Brasil". Por isso a varredura tem teto de páginas — e
+por isso ela **avisa em voz alta** quando para no teto sem esgotar o resultado.
+Recorte truncado tem a mesma aparência de varredura completa, e é assim que se
+conclui coisa errada sobre o mercado.
 
 ## Coleta
 
