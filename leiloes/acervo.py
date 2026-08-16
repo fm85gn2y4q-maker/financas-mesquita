@@ -368,10 +368,15 @@ class Acervo:
             "menor_tiragem": min(tiragens) if tiragens else None,
             "ambiguo": len(verbetes) > 1,
             "como_ler": (
-                "Preço DE CATÁLOGO, de janeiro de 2020 — não é preço de varejo "
-                "nem de liquidação rápida, e não entra na margem calculada por "
-                "este acervo, que usa martelo observado. Serve para duas coisas "
-                "que o martelo não dá: raridade declarada e tiragem. "
+                "Preço DE CATÁLOGO, e **da edição de janeiro de 2020** — leia a "
+                "idade antes do número. São mais de seis anos de inflação em "
+                "reais, e nas peças de ouro e prata há ainda a variação da "
+                "cotação do metal, que move o piso da moeda independentemente "
+                "do mercado numismático. Não é preço de varejo nem de "
+                "liquidação rápida, e não entra na margem calculada por este "
+                "acervo, que usa martelo observado — o martelo, esse, é "
+                "recente. Do catálogo valem sobretudo as duas coisas que NÃO "
+                "envelhecem: raridade declarada e tiragem. "
                 + ("Há mais de um verbete para esta combinação (casas da moeda "
                    "ou variantes distintas) — o acervo não escolhe entre eles."
                    if len(verbetes) > 1 else "")),
