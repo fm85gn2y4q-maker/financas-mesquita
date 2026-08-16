@@ -133,6 +133,18 @@ class Acervo:
         self.custos = custos or Custos()
         self._frequentes: list[str] | None = None
 
+        # O catálogo é OPCIONAL e mora em banco próprio, que não se publica —
+        # é obra protegida, e a cópia é de uso pessoal de quem a tem. Sem ele o
+        # acervo funciona igual; com ele ganha duas coisas que o martelo não dá:
+        # raridade declarada e tiragem.
+        catalogo = Path(os.environ.get("CATALOGO_DB")
+                        or self.caminho.parent / "catalogo.db")
+        self.catalogo: sqlite3.Connection | None = None
+        if catalogo.exists():
+            self.catalogo = sqlite3.connect(f"file:{catalogo}?mode=ro", uri=True,
+                                            check_same_thread=False)
+            self.catalogo.row_factory = sqlite3.Row
+
     def _linhas(self, sql: str, *params) -> list[dict[str, Any]]:
         return [dict(r) for r in self.con.execute(sql, params).fetchall()]
 
@@ -313,6 +325,58 @@ class Acervo:
                           f"por texto não alcança este lote")
         return sinais
 
+    # ----------------------------------------------------------------- catálogo
+
+    def catalogo_da_peca(self, ano: int | None, metal: str | None,
+                         denominacao: str | None) -> dict[str, Any] | None:
+        """O que o catálogo diz desta peça — se houver catálogo ingerido.
+
+        Devolve TODOS os verbetes que casam, e não o primeiro: a mesma
+        denominação no mesmo ano existe em casas da moeda diferentes, com
+        preços diferentes. Escolher um calado seria inventar a casa.
+
+        O preço daqui é **de catálogo**, e não entra na conta da margem. São
+        três preços diferentes na vida real — catálogo, varejo e liquidação
+        rápida —, e eles divergem muito em peça rara. O que o catálogo dá e o
+        martelo não dá é raridade declarada e tiragem.
+        """
+        if not (self.catalogo and ano and metal and denominacao):
+            return None
+
+        verbetes = [dict(r) for r in self.catalogo.execute(
+            """SELECT id, numero, denominacao, metal, peso_g, diametro_mm,
+                      casa_da_moeda, letra, tiragem, periodo, observacoes
+               FROM moeda
+               WHERE ano = ? AND lower(metal) = lower(?)
+                 AND denominacao_norm = lower(?)
+               ORDER BY numero""", (ano, metal, denominacao))]
+        if not verbetes:
+            return None
+
+        for v in verbetes:
+            v["precos"] = [dict(r) for r in self.catalogo.execute(
+                "SELECT grau, valor, raridade FROM preco WHERE moeda_id = ?",
+                (v.pop("id"),))]
+
+        raridades = {p["raridade"] for v in verbetes for p in v["precos"]
+                     if p["raridade"]}
+        tiragens = [v["tiragem"] for v in verbetes if v["tiragem"]]
+        return {
+            "catalogo": "AGA — Catálogo de Moedas Brasileiras (jan/2020)",
+            "verbetes": verbetes,
+            "raridade_declarada": sorted(raridades) or None,
+            "menor_tiragem": min(tiragens) if tiragens else None,
+            "ambiguo": len(verbetes) > 1,
+            "como_ler": (
+                "Preço DE CATÁLOGO, de janeiro de 2020 — não é preço de varejo "
+                "nem de liquidação rápida, e não entra na margem calculada por "
+                "este acervo, que usa martelo observado. Serve para duas coisas "
+                "que o martelo não dá: raridade declarada e tiragem. "
+                + ("Há mais de um verbete para esta combinação (casas da moeda "
+                   "ou variantes distintas) — o acervo não escolhe entre eles."
+                   if len(verbetes) > 1 else "")),
+        }
+
     # -------------------------------------------------------------- comparáveis
 
     def comparaveis(self, chave: str) -> dict[str, Any]:
@@ -382,7 +446,7 @@ class Acervo:
                        l.lance_inicial, l.coletado_em, l.situacao, a.total_lotes,
                        a.data_pregao, a.titulo leilao, c.nome casa, c.uf,
                        i.chave, i.confianca, i.especie, i.catalogo, i.codigo,
-                       i.estado, i.ressalva
+                       i.estado, i.ressalva, i.ano, i.metal, i.denominacao
                 FROM lote l
                 JOIN identificacao i ON i.lote_id = l.id
                 JOIN leilao a ON a.id = l.leilao_id
@@ -438,6 +502,10 @@ class Acervo:
                 },
                 "por_que_pode_estar_esquecido": self._sinais(
                     lote, bool(lote["catalogo"]), lote["total_lotes"]),
+                # Ao lado da conta, nunca dentro dela: preço de catálogo não é
+                # preço de mercado, e a margem continua saindo do martelo.
+                "referencia_de_catalogo": self.catalogo_da_peca(
+                    lote["ano"], lote["metal"], lote["denominacao"]),
                 "coletado_em": lote["coletado_em"],
             })
 

@@ -57,6 +57,40 @@ def _numeros(banco: Path) -> str:
             f"identificação e exigem leitura humana.")
 
 
+def conferir_que_nao_ha_catalogo(banco: Path) -> None:
+    """Recusa publicar acervo que carregue catálogo de terceiro dentro.
+
+    O catálogo AGA é obra protegida, com proibição expressa de reprodução
+    (Lei 9.610/1998), e a cópia do usuário é de uso pessoal. Este script existe
+    para gerar **asset público de release no GitHub**, servido depois por um
+    conector cuja aprovação de OAuth é automática. Publicar o catálogo por aqui
+    o transformaria de cópia pessoal em distribuição.
+
+    A separação em `dados/catalogo.db` já evita isso por desenho. Esta função
+    existe para o caso de alguém — inclusive eu, numa refatoração futura —
+    resolver "simplificar" juntando os dois bancos: a partir daí a publicação
+    passaria a redistribuir a obra, e nada avisaria.
+    """
+    con = sqlite3.connect(f"file:{banco}?mode=ro", uri=True)
+    try:
+        tabelas = {t for (t,) in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+    finally:
+        con.close()
+
+    intrusas = tabelas & {"moeda", "preco", "catalogo_moeda", "catalogo_preco"}
+    if intrusas:
+        raise SystemExit(
+            f"ABORTADO: o acervo de leilões contém tabela de catálogo "
+            f"({', '.join(sorted(intrusas))}).\n"
+            f"  O catálogo AGA é obra protegida e a sua cópia é de uso pessoal. "
+            f"Esta release é\n"
+            f"  um arquivo PÚBLICO no GitHub — publicá-lo aqui seria "
+            f"distribuição, que a obra proíbe.\n"
+            f"  O catálogo tem banco próprio, `dados/catalogo.db`, que não se "
+            f"publica.")
+
+
 def preparar(versao: str,
              repositorio: str = "fm85gn2y4q-maker/financas-mesquita") -> int:
     if not BANCO.exists():
@@ -74,6 +108,8 @@ def preparar(versao: str,
               "escrevendo nele\n       (servidor, ingestão) e rode de novo, ou "
               "o acervo publicado sairá\n       sem as últimas alterações.",
               file=sys.stderr)
+
+    conferir_que_nao_ha_catalogo(BANCO)
 
     destino = RAIZ / "dist" / f"leiloes-numismatica-v{versao}.db.gz"
     destino.parent.mkdir(parents=True, exist_ok=True)

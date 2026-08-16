@@ -189,6 +189,27 @@ def construir(
         return acervo.historico(termo, limite=limite)
 
     @mcp.tool()
+    def catalogo_da_peca(ano: int, metal: str, denominacao: str) -> dict[str, Any]:
+        """O que o catálogo diz de uma moeda: verbetes, tiragem e raridade.
+
+        Só responde se houver catálogo ingerido nesta máquina — ele é opcional,
+        mora em banco próprio e não viaja com o acervo publicado.
+
+        O preço daqui é DE CATÁLOGO, não de mercado, e não entra na margem que
+        este servidor calcula: são três preços diferentes na vida real
+        (catálogo, varejo e liquidação rápida) e divergem muito em peça rara. O
+        que o catálogo dá e o martelo não dá é raridade declarada e tiragem.
+        `denominacao` no formato "6400 réis"."""
+        achado = acervo.catalogo_da_peca(ano, metal, denominacao)
+        if achado is None:
+            return {"encontrado": False,
+                    "motivo": ("nenhum catálogo ingerido nesta máquina"
+                               if acervo.catalogo is None
+                               else "nenhum verbete casa com ano, metal e "
+                                    "denominação informados")}
+        return achado
+
+    @mcp.tool()
     def pesquisar_lotes(consulta: str, situacao: str | None = None,
                         limite: int = 30) -> dict[str, Any]:
         """Busca no texto dos lotes. `situacao`: aberto, arrematado,

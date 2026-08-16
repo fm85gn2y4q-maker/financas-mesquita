@@ -288,3 +288,53 @@ e coleta que grava lixo é pior que coleta que falha.
 > São hipótese sobre a marcação, não medição dela. Rode
 > `descobrir_leiloesbr.py` numa máquina que alcance o portal **antes** da
 > primeira varredura: ele diz, padrão por padrão, qual casou e qual não.
+
+## O catálogo, quando você tem um
+
+O acervo funciona sem catálogo nenhum — a referência de preço é martelo
+observado, e continua sendo. Mas quem tem a própria cópia de um catálogo pode
+ingeri-la, e ela dá **duas coisas que o martelo não dá**: raridade declarada e
+tiragem.
+
+    python ingerir_catalogo_aga.py <catalogo.txt>   # → dados/catalogo.db
+
+Lê o **Catálogo AGA de Moedas Brasileiras** (texto extraído do PDF). Medido na
+edição de janeiro/2020: 764 tabelas, **4.483 verbetes**, 13.142 cotações, 1.411
+com tiragem, 307 em que a obra declara raridade e não arrisca preço.
+
+**Banco separado, e isso não é arrumação.** O catálogo vai para
+`dados/catalogo.db`, nunca para `leiloes.db`, e `preparar_release_leiloes.py`
+**aborta** se achar tabela de catálogo dentro do acervo. A obra é protegida,
+com proibição expressa de reprodução (Lei 9.610/1998), e a sua cópia é de uso
+pessoal — mas o caminho de publicação deste repositório sobe o acervo como
+**asset público de release no GitHub**, servido por um conector de aprovação
+automática. Ali a cópia pessoal viraria distribuição. A separação existe para
+que isso não aconteça por descuido de arquitetura.
+
+### Três armadilhas desta obra, todas medidas
+
+**1. As colunas de conservação mudam no meio do catálogo.** 460 tabelas cotam
+`BC MBC SOB`; 304 cotam `MBC SOB FC`. Assumir um conjunto fixo desloca todo
+preço em um grau — o valor de FC entra como SOB. Por isso o cabeçalho de *cada*
+tabela é lido, e linha sem cabeçalho reconhecido é contada e descartada, nunca
+adivinhada. A conferência que prova a leitura: BC (2.986) + FC (1.497) = 4.483,
+o total de verbetes.
+
+**2. O número AGA não é único.** Ele reinicia a cada seção de metal: o 633 é
+ouro de 1816, prata de 1818, cobre de 1816 **e** aço de 1993. São 1.139 números
+repetidos. Um lote que cite "AGA 633" sem dizer o metal não está identificado —
+está apenas numerado. Por isso o metal entra na chave.
+
+**3. Raridade não é preço faltando.** `RRRRR` é a obra dizendo que não arrisca
+cotar. Guardar como 0,00 faria a peça mais rara parecer a mais barata da lista.
+
+### O catálogo fica ao lado da conta, nunca dentro dela
+
+`oportunidades` passa a trazer `referencia_de_catalogo` quando houver verbete —
+com tiragem, raridade e preço por grau. **Esse preço não entra na margem.** São
+três preços diferentes na vida real (catálogo, varejo, liquidação rápida), e a
+margem deste acervo sai de martelo observado, que foi a base escolhida.
+
+E quando o catálogo não sabe qual verbete é, ele diz: `960 Réis 1816` em prata
+tem **14 verbetes** — casas da moeda e variantes distintas —, e o acervo devolve
+todos com `ambiguo: true` em vez de escolher um calado.
