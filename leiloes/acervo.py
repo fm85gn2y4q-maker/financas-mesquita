@@ -430,6 +430,166 @@ class Acervo:
                 "o mercado não pagou."),
         }
 
+    # -------------------------------------------------------- valor do metal
+
+    def _teores(self) -> dict[str, dict[str, dict[str, Any]]]:
+        caminho = Path(os.environ.get("TEORES_JSON")
+                       or Path(__file__).resolve().parent / "teores.json")
+        if not caminho.exists():
+            return {}
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+        # Entrada sem fonte declarada NÃO conta. É o que impede um número
+        # colocado "só para testar" de virar base de decisão de compra.
+        return {metal: {chave: v for chave, v in tabela.items()
+                        if not chave.startswith("_") and v.get("fonte")
+                        and v.get("teor")}
+                for metal, tabela in dados.items()
+                if not metal.startswith("_")}
+
+    def _teor_de(self, tabela: dict[str, dict[str, Any]], denominacao: str,
+                 ano: int | None) -> dict[str, Any] | None:
+        """Casa 'denominação|ano_inicial-ano_final' e, na falta, 'denominação'."""
+        for chave, valor in tabela.items():
+            if "|" not in chave:
+                continue
+            nome, faixa = chave.split("|", 1)
+            if nome.strip().lower() != denominacao.lower():
+                continue
+            try:
+                de, ate = (int(x) for x in faixa.split("-"))
+            except ValueError:
+                continue
+            if ano and de <= ano <= ate:
+                return valor
+        return tabela.get(denominacao.lower()) or tabela.get(denominacao)
+
+    def abaixo_do_metal(self, spot_por_grama: dict[str, float],
+                        metal: str = "prata", periodo: str | None = None,
+                        sem_lance: bool = True, limite: int = 30) -> dict[str, Any]:
+        """Lotes cujo custo de arremate fica ABAIXO do metal que a peça contém.
+
+        É a peneira mais dura que este acervo tem, e a única cujo piso não
+        depende do gosto de ninguém: abaixo do valor do metal, a peça vale mais
+        derretida do que como moeda, e o mercado numismático inteiro pode estar
+        errado sem que isso mude a conta.
+
+        Três coisas de que ela depende, e nenhuma o acervo inventa:
+
+        `spot_por_grama`  o preço do metal, EM REAIS POR GRAMA, passado por
+                          quem chama. O acervo não cota metal e não vai buscar
+                          cotação: ela muda todo dia e um número velho aqui
+                          produziria lista errada com cara de atual.
+        peso              vem do catálogo ingerido. Sem catálogo, não há conta.
+        teor              vem de `teores.json`, e o catálogo AGA **não o
+                          declara**. Peça sem teor declarado NÃO entra na lista:
+                          sai contada em `sem_teor_declarado`, para você
+                          preencher. Peso bruto não é prata fina, e a diferença
+                          de liga é maior que a margem que esta peneira procura.
+        """
+        if metal not in spot_por_grama or spot_por_grama[metal] <= 0:
+            return {"erro": f"informe o preço do {metal} em reais por grama, "
+                            f"em `spot_por_grama`",
+                    "exemplo": {"prata": 6.20, "ouro": 480.00}}
+        if self.catalogo is None:
+            return {"erro": "esta peneira precisa do peso da peça, que vem do "
+                            "catálogo — e nenhum catálogo foi ingerido nesta "
+                            "máquina. Veja `ingerir_catalogo_aga.py`."}
+
+        faixas = {"colonia": (1500, 1807), "reino unido": (1808, 1821),
+                  "imperio": (1822, 1889), "republica": (1890, 2030)}
+        faixa = faixas.get((periodo or "").strip().lower().replace("é", "e")
+                           .replace("ô", "o")) if periodo else None
+        if periodo and not faixa:
+            return {"erro": f"período {periodo!r} desconhecido",
+                    "periodos": list(faixas)}
+
+        tabela = self._teores().get(metal, {})
+        candidatos = self._linhas(
+            f"""SELECT l.id, l.numero, l.titulo, l.url, l.lance_inicial,
+                       l.situacao, l.lances, l.coletado_em, a.data_pregao,
+                       c.nome casa, c.uf, i.ano, i.denominacao, i.estado, i.chave
+                FROM lote l
+                JOIN identificacao i ON i.lote_id = l.id
+                JOIN leilao a ON a.id = l.leilao_id
+                JOIN casa c ON c.id = a.casa_id
+                WHERE l.situacao IN ('aberto','pos_pregao')
+                  AND l.lance_inicial IS NOT NULL
+                  AND lower(i.metal) = lower(?)
+                  AND i.denominacao IS NOT NULL AND i.ano IS NOT NULL
+                  {'AND i.ano BETWEEN ? AND ?' if faixa else ''}
+                  {'AND l.lances = 0' if sem_lance else ''}""",
+            *([metal] + (list(faixa) if faixa else [])))
+
+        achados, sem_teor, sem_peso = [], {}, 0
+        for lote in candidatos:
+            referencia = self.catalogo_da_peca(lote["ano"], metal,
+                                               lote["denominacao"])
+            pesos = [v["peso_g"] for v in (referencia or {}).get("verbetes", [])
+                     if v.get("peso_g")]
+            if not pesos:
+                sem_peso += 1
+                continue
+            # O MENOR peso entre os verbetes que casam. Conservador de
+            # propósito: menos metal é menos valor intrínseco, e portanto menos
+            # peça entrando na lista por engano. Nesta peneira, o erro de deixar
+            # passar custa uma oportunidade; o de incluir custa dinheiro.
+            peso = min(pesos)
+
+            teor = self._teor_de(tabela, lote["denominacao"], lote["ano"])
+            if not teor:
+                chave = f"{lote['denominacao']} ({lote['ano']})"
+                sem_teor[chave] = sem_teor.get(chave, 0) + 1
+                continue
+
+            valor_metal = peso * teor["teor"] * spot_por_grama[metal]
+            custo = self.custos.custo_de_arremate(lote["lance_inicial"])
+            if custo >= valor_metal:
+                continue
+
+            achados.append({
+                "lote": {"titulo": lote["titulo"], "url": lote["url"],
+                         "situacao": lote["situacao"], "lances": lote["lances"]},
+                "leilao": {"casa": lote["casa"], "uf": lote["uf"],
+                           "data_pregao": lote["data_pregao"]},
+                "peca": {"ano": lote["ano"], "denominacao": lote["denominacao"],
+                         "estado": lote["estado"], "peso_g": peso,
+                         "teor": teor["teor"], "fonte_do_teor": teor["fonte"]},
+                "dinheiro": {
+                    "lance_pedido": lote["lance_inicial"],
+                    "custo_total_de_arremate": round(custo, 2),
+                    "metal_fino_g": round(peso * teor["teor"], 3),
+                    "valor_do_metal": round(valor_metal, 2),
+                    "desconto_sobre_o_metal": round(1 - custo / valor_metal, 3),
+                },
+                "coletado_em": lote["coletado_em"],
+            })
+
+        achados.sort(key=lambda a: a["dinheiro"]["desconto_sobre_o_metal"],
+                     reverse=True)
+        return {
+            "parametros": {"metal": metal, "periodo": periodo,
+                           "spot_por_grama": spot_por_grama[metal],
+                           "so_sem_lance": sem_lance,
+                           "custos": asdict(self.custos)},
+            "achados": achados[:limite],
+            "candidatos_examinados": len(candidatos),
+            "sem_peso_no_catalogo": sem_peso,
+            "sem_teor_declarado": sem_teor,
+            "como_ler": (
+                "O valor do metal é piso, não preço: peça numismática quase "
+                "sempre vale mais que a prata dela, e quando não vale, o achado "
+                "costuma ser que a peça está mal descrita, danificada ou não é "
+                "o que diz ser. Confirme antes de dar lance. "
+                + (f"{len(sem_teor)} combinações de denominação e ano ficaram "
+                   f"FORA da conta por não haver teor declarado em "
+                   f"`teores.json` — estão listadas em `sem_teor_declarado`, e "
+                   f"enquanto não forem preenchidas esta lista está incompleta "
+                   f"na exata medida delas. " if sem_teor else "")
+                + ("A peneira usou só lotes com contagem de lances igual a "
+                   "zero; lote cuja contagem o portal não publicou ficou de "
+                   "fora, porque desconhecido não é zero." if sem_lance else "")),
+        }
+
     # ------------------------------------------------------------ oportunidades
 
     def oportunidades(self, margem_minima: float = 0.25, n_minimo: int = 5,

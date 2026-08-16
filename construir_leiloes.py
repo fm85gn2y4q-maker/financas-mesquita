@@ -59,8 +59,13 @@ CREATE TABLE lote (
     lance_inicial REAL,
     estimativa_min REAL,
     estimativa_max REAL,
-    -- aberto | arrematado | nao_arrematado | retirado
+    -- aberto | pos_pregao | arrematado | nao_arrematado | retirado
     situacao      TEXT NOT NULL,
+    -- Quantos lances o lote recebeu. NULO É "NÃO SEI", e não zero: a página
+    -- pode não publicar a contagem. A diferença importa porque "sem lance" é
+    -- peneira de peça esquecida, e tratar desconhecido como zero encheria a
+    -- lista de lotes disputados.
+    lances        INTEGER,
     preco_martelo REAL,
     data_resultado TEXT,
     coletado_em   TEXT NOT NULL,
@@ -166,11 +171,12 @@ def construir() -> None:
             titulo = bruto.get("titulo") or ""
             descricao = bruto.get("descricao") or ""
             con.execute(
-                "INSERT OR REPLACE INTO lote VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO lote VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (lote_id, str(leilao["id"]), bruto.get("numero"), titulo, descricao,
                  bruto.get("url"), bruto.get("foto_url"), bruto.get("lance_inicial"),
                  bruto.get("estimativa_min"), bruto.get("estimativa_max"),
-                 bruto.get("situacao") or "aberto", bruto.get("preco_martelo"),
+                 bruto.get("situacao") or "aberto", bruto.get("lances"),
+                 bruto.get("preco_martelo"),
                  bruto.get("data_resultado"), bruto.get("coletado_em") or coletado_em))
 
             vocabulario.update(_tokens(f"{titulo} {descricao}"))

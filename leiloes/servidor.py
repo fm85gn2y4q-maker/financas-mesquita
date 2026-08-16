@@ -189,6 +189,28 @@ def construir(
         return acervo.historico(termo, limite=limite)
 
     @mcp.tool()
+    def oportunidades_abaixo_do_metal(
+            spot_por_grama: float, metal: str = "prata",
+            periodo: str | None = None, sem_lance: bool = True,
+            limite: int = 30) -> dict[str, Any]:
+        """Lotes cujo custo de arremate fica ABAIXO do metal que a peça contém.
+
+        A peneira mais dura do acervo, e a única cujo piso não depende do gosto
+        de ninguém. `spot_por_grama` é o preço do metal EM REAIS POR GRAMA e
+        tem de ser informado por quem chama — o acervo não cota metal, e
+        cotação velha produziria lista errada com cara de atual. `periodo`:
+        colonia, reino unido, imperio ou republica.
+
+        Depende de peso (vem do catálogo ingerido) e de teor (vem de
+        `teores.json`). O catálogo AGA **não declara teor**: peça sem teor
+        declarado não entra na lista e sai contada em `sem_teor_declarado`,
+        porque peso bruto não é metal fino e a diferença de liga é maior que a
+        margem que esta peneira procura."""
+        return acervo.abaixo_do_metal({metal: spot_por_grama}, metal=metal,
+                                      periodo=periodo, sem_lance=sem_lance,
+                                      limite=limite)
+
+    @mcp.tool()
     def catalogo_da_peca(ano: int, metal: str, denominacao: str) -> dict[str, Any]:
         """O que o catálogo diz de uma moeda: verbetes, tiragem e raridade.
 

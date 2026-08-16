@@ -92,6 +92,14 @@ PADROES: dict[str, re.Pattern[str]] = {
         r"\b(n[ãa]o\s+arrematado|sem\s+lance|n[ãa]o\s+vendido|deserto)\b",
         re.IGNORECASE),
     "qualquer_preco": re.compile(r"R\$\s*([\d.]{1,12},\d{2})"),
+    # Contagem de lances. "sem lance" é a peneira de peça esquecida, e ela só
+    # vale se a AUSÊNCIA de contagem não for confundida com zero — por isso o
+    # campo fica nulo quando nenhum destes casa, e nunca 0 por omissão.
+    "lances": re.compile(
+        r"(\d{1,4})\s*lances?\b|\blances?\s*:?\s*(\d{1,4})\b", re.IGNORECASE),
+    "sem_lance": re.compile(
+        r"\b(sem\s+lances?|nenhum\s+lance|aguardando\s+lances?|"
+        r"seja\s+o\s+primeiro)\b", re.IGNORECASE),
     "data_pregao": re.compile(
         r"\b(\d{2})/(\d{2})/(\d{4})(?:\s*[àa]s?\s*\d{1,2}[:h]\d{2})?"),
 }
@@ -147,6 +155,20 @@ def reais(valor: str | None) -> float | None:
         return None
 
 
+def _lances(texto: str) -> int | None:
+    """Quantos lances o lote recebeu, ou None quando a página não diz.
+
+    None e 0 são coisas diferentes e não podem se misturar: "sem lance" é a
+    peneira de peça esquecida, e devolver 0 para lote cuja contagem não foi
+    publicada encheria a lista justamente de lotes disputados.
+    """
+    if PADROES["sem_lance"].search(texto):
+        return 0
+    if (m := PADROES["lances"].search(texto)):
+        return int(m.group(1) or m.group(2))
+    return None
+
+
 def _data_iso(texto: str) -> str | None:
     m = PADROES["data_pregao"].search(texto)
     return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
@@ -180,6 +202,7 @@ def analisar_lote(bloco: str) -> dict[str, Any] | None:
         "estimativa_min": reais(estimativa.group(1)) if estimativa else None,
         "estimativa_max": reais(estimativa.group(2)) if estimativa else None,
         "situacao": situacao,
+        "lances": _lances(bloco),
         "preco_martelo": reais(martelo.group(1)) if martelo else None,
         "data_resultado": _data_iso(bloco) if martelo else None,
     }
@@ -245,7 +268,8 @@ def analisar_busca(html: str, situacao: str) -> list[dict[str, Any]]:
             "url": f"{fontes.PORTAL}/{caminho.lstrip('/')}",
             "foto_url": None, "lance_inicial": None,
             "estimativa_min": None, "estimativa_max": None,
-            "situacao": situacao, "preco_martelo": None, "data_resultado": None,
+            "situacao": situacao, "lances": None,
+            "preco_martelo": None, "data_resultado": None,
         })
         if lote["numero"] is None and numero:
             lote["numero"] = int(numero.group(1))
@@ -253,6 +277,8 @@ def analisar_busca(html: str, situacao: str) -> list[dict[str, Any]]:
             lote["lance_inicial"] = reais(preco.group(1))
         if lote["foto_url"] is None and foto:
             lote["foto_url"] = _absoluta(foto.group(1))
+        if lote["lances"] is None:
+            lote["lances"] = _lances(texto)
         if uteis and len(uteis[0]) > len(lote["titulo"] or ""):
             lote["titulo"] = uteis[0]
             lote["descricao"] = " ".join(uteis[1:3])[:1000]

@@ -1,0 +1,44 @@
+{
+  "_leia_isto": [
+    "Teor (título) do metal precioso, em fração de 0 a 1, por peça.",
+    "",
+    "ESTE ARQUIVO NASCE VAZIO DE PROPÓSITO. O teor NÃO está no catálogo AGA —",
+    "ele declara metal, peso bruto e diâmetro, e nada sobre a liga (medido: 3",
+    "menções a 'Teor' em 16.626 linhas). E teor é justamente o que separa peso",
+    "bruto de prata fina.",
+    "",
+    "Preencher de memória seria o erro mais caro possível aqui: a peneira de",
+    "'abaixo do valor do metal' compara dinheiro com dinheiro, e um teor errado",
+    "de 8% inverte o sinal em toda peça que esteja perto da linha. Por isso o",
+    "acervo se RECUSA a calcular valor de metal de peça cujo teor não esteja",
+    "declarado aqui, e diz quantas ficaram de fora.",
+    "",
+    "COMO PREENCHER. Rode `oportunidades_abaixo_do_metal` uma vez: ela lista, em",
+    "`sem_teor_declarado`, exatamente quais combinações de denominação e ano",
+    "apareceram e ficaram sem conta. Preencha só essas, conferindo em fonte que",
+    "declare o título — decreto de cunhagem, catálogo que traga a liga, ou o",
+    "laudo de uma encapsuladora.",
+    "",
+    "FORMATO. A chave é 'denominação|ano_inicial-ano_final' ou 'denominação' para",
+    "valer em qualquer ano. O casamento é pela denominação normalizada que o",
+    "acervo usa ('960 réis', '6400 réis').",
+    "",
+    "O campo `fonte` não é decoração: é o que permite conferir depois de quem",
+    "veio o número. Entrada sem fonte é tratada como não declarada."
+  ],
+
+  "prata": {
+    "_exemplo_apague_esta_linha": {
+      "teor": 0.000,
+      "fonte": "Preencha com a norma ou catálogo que declara o título, e a data."
+    }
+  },
+
+  "ouro": {},
+
+  "_densidade_nao_serve": [
+    "Não tente inferir teor de peso e diâmetro. Duas ligas diferentes produzem",
+    "a mesma peça dentro da tolerância de cunho, e a conta sai com aparência de",
+    "medição."
+  ]
+}
