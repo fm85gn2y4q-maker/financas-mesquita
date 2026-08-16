@@ -293,6 +293,10 @@ class Acervo:
         visibilidade a mesma aparência que um martelo observado tem.
         """
         sinais = []
+        if lote.get("situacao") == "pos_pregao":
+            sinais.append("não arrematou no pregão e está em venda pós-pregão — "
+                          "o vendedor já viu o mercado recusar o preço dele uma "
+                          "vez, e o lote não disputa com ninguém agora")
         if len(lote.get("descricao") or "") < 80:
             sinais.append("descrição curta — o lote diz pouco sobre a própria peça")
         if not tem_codigo:
@@ -369,9 +373,13 @@ class Acervo:
         com menos de `n_minimo` martelos — esses saem à parte, contados, para
         que a lista curta não passe por mercado sem oportunidade.
         """
+        # `pos_pregao` entra junto com `aberto`, e não é detalhe: são os lotes
+        # que não arremataram e ficaram à venda depois. Deixá-los de fora
+        # excluiria da busca por peça esquecida justamente as peças que o
+        # mercado já esqueceu uma vez.
         abertos = self._linhas(
             f"""SELECT l.id, l.numero, l.titulo, l.descricao, l.url, l.foto_url,
-                       l.lance_inicial, l.coletado_em, a.total_lotes,
+                       l.lance_inicial, l.coletado_em, l.situacao, a.total_lotes,
                        a.data_pregao, a.titulo leilao, c.nome casa, c.uf,
                        i.chave, i.confianca, i.especie, i.catalogo, i.codigo,
                        i.estado, i.ressalva
@@ -379,7 +387,8 @@ class Acervo:
                 JOIN identificacao i ON i.lote_id = l.id
                 JOIN leilao a ON a.id = l.leilao_id
                 JOIN casa c ON c.id = a.casa_id
-                WHERE l.situacao = 'aberto' AND l.lance_inicial IS NOT NULL
+                WHERE l.situacao IN ('aberto','pos_pregao')
+                  AND l.lance_inicial IS NOT NULL
                   {'AND i.especie = ?' if especie else ''}
                   {'AND c.uf = ?' if uf else ''}
                   {'AND l.lance_inicial <= ?' if valor_maximo is not None else ''}
@@ -404,7 +413,8 @@ class Acervo:
 
             achados.append({
                 "lote": {"titulo": lote["titulo"], "numero": lote["numero"],
-                         "url": lote["url"], "tem_foto": bool(lote["foto_url"])},
+                         "url": lote["url"], "tem_foto": bool(lote["foto_url"]),
+                         "situacao": lote["situacao"]},
                 "leilao": {"casa": lote["casa"], "uf": lote["uf"],
                            "titulo": lote["leilao"], "data_pregao": lote["data_pregao"]},
                 "peca": {"chave": lote["chave"], "confianca": lote["confianca"],
@@ -434,7 +444,8 @@ class Acervo:
         achados.sort(key=lambda a: a["dinheiro"]["margem"], reverse=True)
         indefinidos_abertos = self.con.execute(
             """SELECT count(*) FROM lote l JOIN identificacao_indefinida x
-               ON x.lote_id = l.id WHERE l.situacao='aberto'""").fetchone()[0]
+               ON x.lote_id = l.id
+               WHERE l.situacao IN ('aberto','pos_pregao')""").fetchone()[0]
 
         return {
             "parametros": {"margem_minima": margem_minima, "n_minimo": n_minimo,
@@ -500,7 +511,7 @@ class Acervo:
                        x.motivo, x.desarma_com, l.foto_url, l.coletado_em
                 FROM identificacao_indefinida x JOIN lote l ON l.id = x.lote_id
                 JOIN leilao a ON a.id = l.leilao_id JOIN casa c ON c.id = a.casa_id
-                {"WHERE l.situacao = 'aberto'" if so_abertos else ""}
+                {"WHERE l.situacao IN ('aberto','pos_pregao')" if so_abertos else ""}
                 ORDER BY a.data_pregao, l.lance_inicial LIMIT ?""", limite)
         for a in achados:
             a["desarma_com"] = json.loads(a.pop("desarma_com") or "[]")

@@ -154,8 +154,9 @@ Segundo acervo deste repositório, independente do financeiro: rastreia o portal
 peça de cada lote e mede a distância entre o lance pedido num lote aberto e o
 que peças iguais arremataram no mesmo portal.
 
-    python descobrir_leiloesbr.py --leilao <id>   # mede a estrutura real do portal
-    python coletar_leiloesbr.py                   # varre o catálogo, grava o cru
+    python descobrir_leiloesbr.py                 # mede a estrutura real do portal
+    python coletar_leiloesbr.py --abertos         # tudo que está em pregão agora
+    python coletar_leiloesbr.py --historico       # os martelos, base de comparação
     python construir_leiloes.py                   # dados_brutos/ → dados/leiloes.db
     python -m pytest tests/test_leiloes.py tests/test_coletor_leiloes.py
     python -m leiloes                             # servidor MCP (stdio)
@@ -226,12 +227,43 @@ padrão de 0,50 é chute conservador, ninguém publica esse número, e ele move 
 lista inteira: passar de 0,50 para 0,30 costuma zerá-la. Meça a sua contra os
 negócios que você de fato fizer.
 
+## Três rotas, três perguntas
+
+O portal tem busca própria sobre os leilões em andamento, e é por ela que se
+entra — não leilão por leilão.
+
+| rota | endpoint | responde |
+|---|---|---|
+| `--abertos` | `busca_andamento.asp` | o que se pode comprar **agora** |
+| `--pos` | `buscapos.asp` | o que **não arrematou** e ficou à venda depois |
+| `--historico` | `catalogo.asp` → `leilao.asp` | os **martelos**, base da comparação |
+
+Confundi-las é confundir o que se pode comprar com o que já foi vendido: só a
+terceira alimenta a mediana, e as duas primeiras alimentam a lista de
+oportunidades. O pós-pregão entra na lista junto com os abertos e sai
+sinalizado — é peça que o mercado já recusou uma vez, e o vendedor sabe disso.
+
+**A categoria é o nome em hexadecimal cp1252.** Medido nos endereços públicos
+do portal: `tp=|43696E656D61|` é "Cinema", e o `ê` de "Memorabilia & Efêmera"
+aparece como `EA` — um byte, não os dois do UTF-8. Errar a codificação não dá
+erro: devolve busca vazia, que passa por "não há peça nesta categoria". Daí
+`categoria_hex()`, e daí `descobrir_leiloesbr.py` **decodificar as categorias
+reais do portal** em vez de deixar você adivinhar o nome exato.
+
+    python coletar_leiloesbr.py --abertos --categoria Numismática
+    python coletar_leiloesbr.py --pos --categoria Filatelia
+
 ## Coleta
 
 Lenta de propósito: 2,5 s entre requisições (`LEILOES_ESPERA`), User-Agent
 identificável com contato (`LEILOES_CONTATO`) e `robots.txt` conferido antes de
 varrer. Não é escrúpulo — é a diferença entre ter e não ter o acervo no mês que
 vem.
+
+A paginação tem duas paradas, e a segunda é a que importa: ASP costuma
+**grampear** o número de página ao máximo existente em vez de devolver vazio.
+Sem a guarda que detecta página repetida, a varredura bate na última página até
+o teto parecendo que está coletando.
 
 A extração é por **rótulo visível** ("Lance inicial:", "Arrematado por:"), não
 por seletor de HTML: site ASP dessa geração reescreve a marcação sem aviso, e

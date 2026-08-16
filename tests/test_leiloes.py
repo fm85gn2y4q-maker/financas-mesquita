@@ -229,6 +229,35 @@ def test_a_fracao_do_revendedor_move_a_lista_inteira(acervo):
     assert magro.oportunidades(margem_minima=0.10, n_minimo=5)["achados"] == []
 
 
+def test_lote_de_pos_pregao_entra_na_lista_e_sai_sinalizado(tmp_path, monkeypatch):
+    """O que não arrematou e ficou à venda depois é peça que o mercado já
+    esqueceu uma vez. Deixá-lo fora excluiria justamente o alvo da busca."""
+    import construir_leiloes
+
+    brutos = tmp_path / "dados_brutos" / "leiloesbr"
+    brutos.mkdir(parents=True)
+    destino = tmp_path / "dados" / "leiloes.db"
+    monkeypatch.setattr(construir_leiloes, "BRUTOS", brutos)
+    monkeypatch.setattr(construir_leiloes, "DESTINO", destino)
+
+    lotes = [_lote(n, "Moeda 20 Réis 1869 bronze MBC KM# 474",
+                   descricao="Bronze do Império, reverso limpo, sem soldas.",
+                   situacao="arrematado", preco_martelo=1000.0 + n,
+                   data_resultado="2026-03-10") for n in range(1, 7)]
+    lotes.append(_lote(50, "Moeda 20 Réis 1869 bronze MBC KM# 474",
+                       situacao="pos_pregao", lance_inicial=250.0))
+    (brutos / "leilao-1.json").write_text(
+        json.dumps(_leilao("1", "Casa", "2026-03-10", lotes), ensure_ascii=False),
+        encoding="utf-8")
+    construir_leiloes.construir()
+
+    saida = Acervo(destino).oportunidades(margem_minima=0.10, n_minimo=5)
+    assert len(saida["achados"]) == 1
+    achado = saida["achados"][0]
+    assert achado["lote"]["situacao"] == "pos_pregao"
+    assert any("pós-pregão" in s for s in achado["por_que_pode_estar_esquecido"])
+
+
 @pytest.fixture
 def acervo_com_erro_de_grafia(tmp_path, monkeypatch):
     """Um catálogo onde "bronze" é corrente e um lote escreve "bronse"."""

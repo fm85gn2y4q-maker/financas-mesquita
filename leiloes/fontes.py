@@ -36,6 +36,37 @@ BRUTOS = RAIZ / "dados_brutos"
 PORTAL = "https://www.leiloesbr.com.br"
 PORTAL_ESPELHO = "https://www2.leiloesbr.com.br"
 
+# As três entradas do portal, cada uma respondendo a uma pergunta diferente.
+# Confundi-las é confundir o que se pode comprar com o que já foi vendido.
+#
+#   BUSCA_ABERTOS  "Busca peças": percorre os leilões EM ANDAMENTO. É o que se
+#                  pode dar lance hoje. Com `pesquisa` vazio, enumera tudo.
+#   BUSCA_POS      "Busca venda pós pregão": o que NÃO arrematou e ficou à
+#                  venda depois. Para quem caça peça esquecida, é o filão mais
+#                  óbvio do portal — o vendedor já viu o mercado recusar o
+#                  preço dele.
+#   BUSCA_GERAL    busca ampla, inclusive fora de leilão em andamento.
+BUSCA_ABERTOS = "busca_andamento.asp"
+BUSCA_POS = "buscapos.asp"
+BUSCA_GERAL = "busca.asp"
+
+
+def categoria_hex(nome: str) -> str:
+    """Nome de categoria → o valor que o portal espera no parâmetro `tp`.
+
+    O portal codifica o nome da categoria em hexadecimal, entre barras
+    verticais, e o faz em **cp1252** — não em UTF-8. Medido nos endereços
+    públicos do próprio portal:
+
+        tp=|43696E656D61|                     → "Cinema"
+        tp=|4D656D6F726162696C6961...4566EA…| → "Memorabilia & Efêmera"
+
+    O `EA` de "Efêmera" é o que prova a codificação: em UTF-8 o ê seria C3AA,
+    de dois bytes. Errar isso não dá erro — devolve busca vazia, que passa por
+    "não há peça nesta categoria".
+    """
+    return "|" + nome.encode("cp1252").hex().upper() + "|"
+
 # Segundos entre requisições. Não baixe isto sem falar com a casa: o portal é
 # ASP clássico servindo página inteira a cada clique, e a varredura completa do
 # catálogo são milhares de páginas.
