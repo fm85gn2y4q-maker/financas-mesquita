@@ -131,3 +131,70 @@ vezes quiser, e nunca vai à rede.
 Depois, para republicar: `preparar_release.py <nova versão>`, anexar o `.gz`,
 trocar as duas linhas do Dockerfile, commitar. O Render reconstrói e confere o
 hash; divergindo, o build falha em vez de subir acervo diferente do testado.
+
+---
+
+# Publicar o acervo de leilões
+
+Segundo serviço, com banco, endereço e conector próprios. O `render.yaml` já
+declara os dois; o `Dockerfile.leiloes` é a imagem deste.
+
+## A ordem importa, e ela começa fora daqui
+
+Este acervo **não existe antes da primeira coleta**, e a coleta depende de uma
+máquina que alcance o `leiloesbr.com.br`. Aplicar o Blueprint antes disso faz
+este serviço falhar na construção — de propósito, com a mensagem dizendo o que
+falta — enquanto o serviço financeiro sobe normalmente. É a razão de serem duas
+imagens e não uma.
+
+    python descobrir_leiloesbr.py --leilao <id>   # mede a página real
+    # corrija PADROES em coletar_leiloesbr.py com o relatório na mão
+    python coletar_leiloesbr.py
+    python construir_leiloes.py
+    python -m pytest tests/test_leiloes.py tests/test_publicacao_leiloes.py
+    python preparar_release_leiloes.py 1.0.0
+
+O script imprime o resumo do conteúdo, o `gh release create` pronto e as duas
+linhas para o `Dockerfile.leiloes`. Repare no número que ele destaca: **quantos
+lotes ficaram sem identificação**. É ele, e não o total de lotes, que diz se o
+acervo publicado presta.
+
+A tag leva o prefixo `leiloes-` porque as duas releases moram no mesmo
+repositório — sem ele, publicar como `v1.0.0` colidiria com a tag do acervo
+financeiro.
+
+## Depois do primeiro deploy
+
+Três variáveis, preenchidas quando o endereço público nascer:
+
+| variável | para quê |
+|---|---|
+| `LEILOES_DOMINIOS` | `leiloes-numismatica.onrender.com` — sem isso, 421 em tudo |
+| `LEILOES_URL_PUBLICA` | `https://leiloes-numismatica.onrender.com` — ativa o OAuth do ChatGPT |
+| `LEILOES_SEGREDO_OAUTH` | o Blueprint gera. Não deixe vazio |
+
+Conferido contra o servidor no ar: `/.well-known/oauth-authorization-server`
+responde com o escopo `leiloes-numismatica`, o registro dinâmico de cliente
+funciona, e `POST /mcp` sem token leva 401.
+
+## O aviso que este acervo tem e os outros não
+
+**A aprovação do OAuth é automática.** Quem chegar à URL completa o fluxo e
+recebe um token. Isso protege contra chamada sem token, não contra quem conhece
+o endereço.
+
+Nos acervos públicos deste repositório isso era aceitável: Diário Oficial e
+legislação municipal a Prefeitura já publica, e o pior que acontece é alguém
+ler o que já era lido. Aqui não. Os lotes vêm de portal público, mas a **lista
+de oportunidades não** — ela é a sua leitura de mercado, e quem a obtiver dá
+lance contra você no mesmo pregão. Trate a URL como credencial: não a publique,
+não a ponha em repositório público, e prefira mantê-la fora de índice de busca.
+
+Querendo fechar de vez, o caminho é trocar `LEILOES_SEGREDO_OAUTH` — todas as
+assinaturas antigas param de valer de uma vez.
+
+## Escopo separado, de propósito
+
+O escopo deste conector é `leiloes-numismatica`, e o do financeiro,
+`financas-mesquita`. Dois conectores com o mesmo escopo no mesmo cliente
+disputam a mesma autorização. Há teste que confere que eles não coincidem.

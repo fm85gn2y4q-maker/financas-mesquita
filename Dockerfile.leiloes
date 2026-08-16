@@ -1,0 +1,57 @@
+# Imagem do servidor do acervo de leilões de numismática (Render, Cloud Run, Fly).
+#
+# Separada da imagem do acervo financeiro de propósito: são dois serviços, com
+# dois bancos, dois endereços públicos e dois conectores. Uma imagem só teria
+# de carregar os dois acervos e escolher entre eles em tempo de execução — o
+# que faria o serviço financeiro cair quando a coleta de leilões falhasse.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-servidor.txt ./
+RUN pip install --no-cache-dir -r requirements-servidor.txt
+
+# `leiloes/armadilhas.json` viaja junto: sem ele o servidor sobe e identifica
+# peça que não deveria identificar. Não é configuração opcional — é a lista de
+# casos em que a descrição não determina a peça, e sem ela o acervo passa a dar
+# nota a lote ambíguo em silêncio.
+COPY leiloes/ ./leiloes/
+
+# O acervo NÃO viaja no repositório, pela mesma razão do acervo financeiro:
+# `dados/` está no .gitignore, e cada coleta somaria outro tanto ao histórico,
+# para sempre. Vem como asset de release, com o sha256 conferido ANTES de
+# descomprimir — divergindo o publicado do declarado, a construção falha em vez
+# de subir um acervo diferente do que foi testado.
+#
+# Enquanto estas duas linhas estiverem vazias, a construção para no
+# instalar_acervo.py com mensagem explícita. É de propósito: imagem sem acervo
+# subiria e só falharia na primeira consulta do usuário.
+#
+# ATENÇÃO à ordem — este acervo não existe antes da primeira coleta, e a coleta
+# depende de uma máquina que alcance o portal:
+#
+#   1. python descobrir_leiloesbr.py --leilao <id>   (mede a página real)
+#   2. corrigir PADROES em coletar_leiloesbr.py
+#   3. python coletar_leiloesbr.py && python construir_leiloes.py
+#   4. python preparar_release_leiloes.py <versão>   (imprime as duas linhas)
+#
+# O script da release é o `_leiloes`, não o do acervo financeiro: os dois leem
+# bancos diferentes e resumem conteúdos diferentes.
+ARG ACERVO=
+ARG ACERVO_SHA256=
+COPY instalar_acervo.py ./
+RUN python instalar_acervo.py "$ACERVO" dados/leiloes.db "$ACERVO_SHA256"
+
+# O serviço define a porta; 8080 é o padrão do Cloud Run quando ele não define.
+ENV PORT=8080 \
+    LEILOES_HOST=0.0.0.0 \
+    LEILOES_DB=/app/dados/leiloes.db \
+    PYTHONUTF8=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8080
+
+# LEILOES_DOMINIOS é definido depois do primeiro deploy, quando o endereço
+# público passa a existir. Sem ele, só requisições locais são aceitas — o que
+# na prática significa que o serviço responde 421 a tudo.
+CMD ["python", "-m", "leiloes", "--http"]

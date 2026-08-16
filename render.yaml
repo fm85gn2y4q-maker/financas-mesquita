@@ -39,3 +39,30 @@ services:
       # inteiro.
       - key: FINANCAS_SEGREDO_OAUTH
         generateValue: true
+
+  # Segundo serviço, com banco, endereço e conector próprios. As observações
+  # acima valem inteiras para ele — inclusive a ausência de `healthCheckPath`,
+  # que é a mesma limitação do mesmo endpoint MCP.
+  #
+  # Este serviço só constrói DEPOIS da primeira coleta de leilões: enquanto os
+  # ARG do Dockerfile.leiloes estiverem vazios, o build para com a mensagem
+  # dizendo o que falta. Aplicar o Blueprint antes disso faz este serviço
+  # falhar e o financeiro subir normalmente — que é o comportamento desejado,
+  # e a razão de serem duas imagens.
+  - type: web
+    name: leiloes-numismatica
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.leiloes
+
+    envVars:
+      - key: LEILOES_DOMINIOS
+        sync: false
+      - key: LEILOES_URL_PUBLICA
+        sync: false
+      # A aprovação do OAuth é automática: quem chega à URL recebe token. Nos
+      # acervos públicos isso era aceitável; aqui a lista de oportunidades é
+      # leitura de mercado, e quem a obtiver dá lance contra você no mesmo
+      # pregão. Trate o endereço como credencial.
+      - key: LEILOES_SEGREDO_OAUTH
+        generateValue: true

@@ -26,17 +26,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dominio", action="append", metavar="HOST",
                         help="domínio público por onde o servidor será acessado. "
                              "Sem isto, só requisições locais passam. Pode repetir.")
+    parser.add_argument("--url-publica", metavar="URL",
+                        help="endereço público completo. Ativa o fluxo OAuth, "
+                             "exigido pelo ChatGPT. O Claude conecta sem isto.")
     args = parser.parse_args(argv)
 
+    from .autenticacao import VARIAVEL_DO_SEGREDO
     from .servidor import construir
 
     dominios = list(args.dominio or [])
     dominios += [d.strip() for d in
                  os.environ.get("LEILOES_DOMINIOS", "").split(",") if d.strip()]
 
+    url_publica = args.url_publica or os.environ.get("LEILOES_URL_PUBLICA")
+    if url_publica and not url_publica.startswith(("http://", "https://")):
+        url_publica = f"https://{url_publica}"
+
     ajustes = {"host": args.host, "port": args.porta} if args.http else {}
     try:
-        servidor = construir(args.banco, dominios=dominios or None, **ajustes)
+        servidor = construir(args.banco, dominios=dominios or None,
+                             url_publica=url_publica,
+                             segredo_oauth=os.environ.get(VARIAVEL_DO_SEGREDO),
+                             **ajustes)
     except FileNotFoundError as erro:
         print(f"Erro: {erro}\nRode `python construir_leiloes.py` antes.",
               file=sys.stderr)
