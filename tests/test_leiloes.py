@@ -229,6 +229,45 @@ def test_a_fracao_do_revendedor_move_a_lista_inteira(acervo):
     assert magro.oportunidades(margem_minima=0.10, n_minimo=5)["achados"] == []
 
 
+@pytest.fixture
+def acervo_com_erro_de_grafia(tmp_path, monkeypatch):
+    """Um catálogo onde "bronze" é corrente e um lote escreve "bronse"."""
+    import construir_leiloes
+
+    brutos = tmp_path / "dados_brutos" / "leiloesbr"
+    brutos.mkdir(parents=True)
+    destino = tmp_path / "dados" / "leiloes.db"
+    monkeypatch.setattr(construir_leiloes, "BRUTOS", brutos)
+    monkeypatch.setattr(construir_leiloes, "DESTINO", destino)
+
+    lotes = [_lote(n, f"Moeda 2 Cruzeiros {1936 + n} bronze MBC KM# 558",
+                   descricao="Bronze de cunho firme.", situacao="arrematado",
+                   preco_martelo=180.0 + n, data_resultado="2026-03-10")
+             for n in range(1, 26)]
+    lotes.append(_lote(90, "Moeda 2 Cruzeiros 1942 bronse MBC KM# 558",
+                       lance_inicial=40.0))
+    (brutos / "leilao-1.json").write_text(
+        json.dumps(_leilao("1", "Casa", "2026-03-10", lotes), ensure_ascii=False),
+        encoding="utf-8")
+    construir_leiloes.construir()
+    return Acervo(destino)
+
+
+def test_erro_de_uma_letra_e_detectado(acervo_com_erro_de_grafia):
+    """A regressão que o demo pegou: com `difflib` e corte em 0,86, "bronse"
+    contra "bronze" dava 0,833 e o sinal NUNCA disparava — justamente na classe
+    de erro mais comum, e em silêncio."""
+    achados = acervo_com_erro_de_grafia._grafia_divergente(
+        "Moeda 2 Cruzeiros 1942 bronse MBC KM# 558")
+    assert achados == [{"escrito": "bronse", "corrente_no_catalogo": "bronze"}]
+
+
+def test_palavra_correta_nao_vira_erro_de_grafia(acervo_com_erro_de_grafia):
+    """O sinal só vale se não disparar no lote bem escrito."""
+    assert acervo_com_erro_de_grafia._grafia_divergente(
+        "Moeda 2 Cruzeiros 1942 bronze MBC KM# 558") == []
+
+
 def test_descricao_curta_e_sinalizada(acervo):
     achado = acervo.oportunidades(margem_minima=0.10, n_minimo=5)["achados"][0]
     assert any("descrição curta" in s

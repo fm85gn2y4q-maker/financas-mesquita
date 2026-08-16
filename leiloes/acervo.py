@@ -42,7 +42,6 @@ AS QUATRO ARMADILHAS DESTE ACERVO
 
 from __future__ import annotations
 
-import difflib
 import json
 import os
 import sqlite3
@@ -99,6 +98,27 @@ def _mad(valores: list[float], mediana: float) -> float:
 def _sem_acento(texto: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", texto or "")
                    if unicodedata.category(c) != "Mn").lower()
+
+
+def _distancia(a: str, b: str, limite: int) -> int:
+    """Distância de edição (Levenshtein), com saída antecipada.
+
+    Para de contar assim que a linha inteira passa do limite: a comparação roda
+    contra todo o vocabulário corrente do acervo, e sem o corte a varredura de
+    um catálogo grande fica quadrática à toa.
+    """
+    if abs(len(a) - len(b)) > limite:
+        return limite + 1
+    anterior = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        atual = [i]
+        for j, cb in enumerate(b, start=1):
+            atual.append(min(anterior[j] + 1, atual[j - 1] + 1,
+                             anterior[j - 1] + (ca != cb)))
+        if min(atual) > limite:
+            return limite + 1
+        anterior = atual
+    return anterior[-1]
 
 
 class Acervo:
@@ -227,23 +247,39 @@ class Acervo:
         """Termos do título que quase casam com um termo corrente do catálogo.
 
         É a assimetria mais barata que existe num leilão e não tem nada de
-        sofisticado: o lote escrito "Reís" ou "Cruzeriro" não aparece na busca
+        sofisticado: o lote escrito "bronse" ou "Cruzeriro" não aparece na busca
         de ninguém. Quem filtra por texto passa direto, o lote chega ao pregão
         com meia dúzia de olhos em cima, e o lance fica onde começou.
+
+        A régua é distância de edição, e não semelhança de sequência. A primeira
+        versão usava `difflib` com corte em 0,86 e não disparava nunca: a troca
+        de UMA letra em palavra de seis — "bronse" por "bronze" — dá 0,833 de
+        semelhança e ficava abaixo do corte. Ou seja, o filtro rejeitava
+        exatamente a classe de erro que ele existe para achar, e em silêncio.
+        Baixar o corte resolveria pelo lado errado, deixando entrar par
+        distante; a distância de edição diz o que se quer dizer de verdade —
+        "isto é o mesmo termo com um erro de digitação".
         """
         frequentes = self._tokens_frequentes()
         if not frequentes:
             return []
         raros = {r["token"] for r in self._linhas(
             "SELECT token FROM vocabulario WHERE ocorrencias <= 2")}
+
         achados = []
-        for token in set(_sem_acento(titulo).replace("-", " ").split()):
-            token = "".join(c for c in token if c.isalnum())
+        for bruto in set(_sem_acento(titulo).replace("-", " ").split()):
+            token = "".join(c for c in bruto if c.isalnum())
             if len(token) < 5 or token not in raros:
                 continue
-            perto = difflib.get_close_matches(token, frequentes, n=1, cutoff=0.86)
-            if perto and perto[0] != token:
-                achados.append({"escrito": token, "corrente_no_catalogo": perto[0]})
+            # Palavra longa tolera dois erros; curta, só um. Dois erros em seis
+            # letras já não é typo — é outra palavra.
+            limite = 2 if len(token) >= 8 else 1
+            melhor = min(
+                (t for t in frequentes if abs(len(t) - len(token)) <= limite),
+                key=lambda t: _distancia(token, t, limite), default=None)
+            if melhor and melhor != token \
+                    and _distancia(token, melhor, limite) <= limite:
+                achados.append({"escrito": token, "corrente_no_catalogo": melhor})
         return achados
 
     def _sinais(self, lote: dict[str, Any], tem_codigo: bool,
