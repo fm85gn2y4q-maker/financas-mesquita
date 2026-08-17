@@ -84,6 +84,16 @@ CATALOGOS: list[tuple[str, re.Pattern[str]]] = [
                            re.IGNORECASE)),
     ("Scott",   re.compile(r"\bScott\s*#?\s*[-–]?\s*(\d{1,4}[a-zA-Z]?)\b", re.IGNORECASE)),
     ("Gomes",   re.compile(r"\bGomes\s*#?\s*[-–]?\s*(\d{1,4}[a-zA-Z]?)\b", re.IGNORECASE)),
+    # Citação genérica "Cat.<sigla>.<número>", que as casas usam para catálogos
+    # que este acervo não conhece pelo nome. Colhida de título real de lote:
+    #   "Moeda do Brasil - 1.000 Réis 1888 - Prata - … - Cat.AI.P.654"
+    #
+    # A sigla é guardada como veio, SEM traduzir para um catálogo conhecido: não
+    # se sabe o que "AI.P" designa, e adivinhar produziria equivalência falsa
+    # entre catálogos. Para o comparável basta que a citação seja estável — dois
+    # lotes que citem o mesmo código são a mesma peça, qualquer que seja a obra.
+    ("Cat",     re.compile(r"\bCat\.?\s*([A-Z][A-Za-z]{0,4}(?:\.[A-Z][A-Za-z]{0,4})*"
+                           r"\.?\s*\d{1,5}[a-zA-Z]?)\b")),
 ]
 
 # --------------------------------------------------------------------- léxicos
@@ -100,8 +110,16 @@ METAIS = {
 # em lote de Império, e sem ela a denominação sai vazia justamente nas peças
 # mais caras do acervo.
 _MIL_REIS = re.compile(r"\b(\d{1,3})\$(\d{3})\b")
+
+# O ponto de milhar tem de vir ANTES da forma sem ponto na alternância, e isso
+# não é estilo: sem ele, "1.000 Réis" casava só "000 Réis" e a peça saía como
+# "0 réis". O erro alcançava justamente as moedas caras — 1.000, 2.000, 6.400,
+# 12.800 réis, que é como o Império e a Colônia se escrevem —, e produzia chave
+# de comparação errada em silêncio. Achado no primeiro título real de lote que
+# este acervo viu: "Moeda do Brasil - 1.000 Réis 1888 - Prata".
 _DENOMINACAO = re.compile(
-    r"\b(\d{1,5})\s*(r[ée]is|centavos?|cruzeiros?\s*novos?|cruzeiros?|"
+    r"\b(\d{1,3}(?:\.\d{3})+|\d{1,6})\s*"
+    r"(r[ée]is|centavos?|cruzeiros?\s*novos?|cruzeiros?|"
     r"cruzados?\s*novos?|cruzados?|reais?)\b", re.IGNORECASE)
 
 # Ano de cunho. O recorte 1500-2029 é largo de propósito (há lote colonial), e
@@ -219,7 +237,7 @@ def _denominacao(texto: str) -> str | None:
         # A unidade é canonizada antes de concordar, e não depois: o texto da
         # casa escreve "1 Cruzeiro" e "1 cruzeiros" indiferentemente, e a chave
         # do comparável tem de sair igual nos dois casos.
-        quantidade = int(m.group(1))
+        quantidade = int(m.group(1).replace(".", ""))
         if quantidade == 1 and unidade.endswith("s") and unidade != "réis":
             unidade = unidade[:-1] if " " not in unidade else \
                 unidade.replace("s ", " ", 1).rstrip("s")

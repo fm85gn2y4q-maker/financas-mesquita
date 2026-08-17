@@ -77,6 +77,41 @@ class Custos:
     def custo_de_arremate(self, lance: float) -> float:
         return lance * (1 + self.comissao + self.taxa_administrativa) + self.frete
 
+    def composicao(self) -> list[dict[str, Any]]:
+        """Cada parcela do custo, e de onde ela vem.
+
+        Existe porque o número somado esconde a diferença que mais importa:
+        **uma das parcelas tem base legal e a outra é suposição minha**. A
+        comissão de 5% está no Decreto 21.981/1932; a taxa administrativa não
+        está em lei nenhuma, varia entre casas, e há casa cujo "Como comprar"
+        menciona só a comissão legal. Apresentar `× 1,10` como se fosse medido
+        é atribuir à casa uma cobrança que ela pode não fazer.
+
+        O padrão mantém os 5% porque, numa peneira, superestimar o custo faz
+        perder oportunidade e subestimar faz perder dinheiro. Mas quem lê a
+        resposta precisa saber qual das duas parcelas conferir no edital.
+        """
+        return [
+            {"parcela": "comissão do leiloeiro", "fracao": self.comissao,
+             "base": "art. 24 do Decreto 21.981/1932, para bens móveis",
+             "confirmado": True},
+            {"parcela": "taxa administrativa da casa",
+             "fracao": self.taxa_administrativa,
+             "base": "NÃO tem base legal e varia entre casas. Há casa que "
+                     "declara apenas a comissão legal de 5%. CONFIRA NO EDITAL "
+                     "do leilão antes de dar lance; se a casa não cobrar, passe "
+                     "taxa_administrativa=0.",
+             "confirmado": False},
+            {"parcela": "frete e seguro", "valor_fixo": self.frete,
+             "base": "estimativa por lote, para peça pequena e leve",
+             "confirmado": False},
+            {"parcela": "fração que o revendedor paga",
+             "fracao": self.fracao_revendedor,
+             "base": "ninguém publica este número. Meça o seu nos negócios que "
+                     "fizer — é a variável que mais move a lista.",
+             "confirmado": False},
+        ]
+
     def receita_de_revenda(self, preco_de_mercado: float) -> float:
         return preco_de_mercado * self.fracao_revendedor
 
@@ -596,7 +631,8 @@ class Acervo:
             "parametros": {"metal": metal, "periodo": periodo,
                            "spot_por_grama": spot_por_grama[metal],
                            "so_sem_lance": sem_lance,
-                           "custos": asdict(self.custos)},
+                           "custos": asdict(self.custos),
+                           "de_onde_vem_cada_custo": self.custos.composicao()},
             "achados": achados[:limite],
             "candidatos_examinados": len(candidatos),
             "sem_peso_no_catalogo": sem_peso,
@@ -708,7 +744,8 @@ class Acervo:
 
         return {
             "parametros": {"margem_minima": margem_minima, "n_minimo": n_minimo,
-                           "custos": asdict(self.custos)},
+                           "custos": asdict(self.custos),
+                           "de_onde_vem_cada_custo": self.custos.composicao()},
             "achados": achados[:limite],
             "lotes_abertos_examinados": len(abertos),
             "descartados_por_falta_de_comparavel": sem_base,

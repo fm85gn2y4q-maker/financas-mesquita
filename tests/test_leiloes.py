@@ -301,3 +301,56 @@ def test_descricao_curta_e_sinalizada(acervo):
     achado = acervo.oportunidades(margem_minima=0.10, n_minimo=5)["achados"][0]
     assert any("descrição curta" in s
                for s in achado["por_que_pode_estar_esquecido"])
+
+
+# ------------------------------- títulos reais, colhidos do portal
+
+def test_o_ponto_de_milhar_nao_zera_a_denominacao():
+    """A regressão que só um título REAL do portal revelou.
+
+        "Moeda do Brasil - 1.000 Réis 1888 - Prata - Império do Brazil"
+
+    A expressão casava "000 Réis" e a peça saía como "0 réis" — chave de
+    comparação errada, em silêncio, e justamente nas moedas caras: 1.000,
+    2.000, 6.400 e 12.800 réis é como o Império e a Colônia se escrevem.
+    """
+    peca = identificar("Moeda do Brasil - 1.000 Réis 1888 - Prata - "
+                       "Império do Brazil - Cat.AI.P.654 - MBC")
+    assert peca["denominacao"] == "1000 réis"
+    assert peca["anos"] == [1888]
+    assert peca["metal"] == "prata"
+    assert peca["estado"] == "MBC"
+
+
+def test_a_citacao_generica_de_catalogo_e_reconhecida():
+    """"Cat.AI.P.654" é como uma casa cita catálogo que este acervo não conhece
+    pelo nome. A sigla fica como veio: adivinhar a que obra corresponde
+    produziria equivalência falsa entre catálogos."""
+    peca = identificar("Moeda 1.000 Réis 1888 - Prata - Cat.AI.P.654 - MBC")
+    assert peca["codigos"][0] == {"catalogo": "Cat", "codigo": "AI.P.654",
+                                  "trecho": "Cat.AI.P.654"}
+    assert peca["chave"] == "Cat:AI.P.654|MBC"
+
+
+def test_titulo_sem_grau_continua_indefinido():
+    """O título real não trazia conservação, e sem ela não há chave. É o
+    comportamento correto: o grau costuma estar na ficha, não no título."""
+    peca = identificar("Moeda do Brasil - 1.000 Réis 1888 - Prata - "
+                       "Império do Brazil - Cat.AI.P.654")
+    assert peca["confianca"] == "indefinida"
+    assert peca["chave"] is None
+
+
+def test_a_composicao_do_custo_separa_o_que_e_lei_do_que_e_suposicao():
+    """`× 1,10` esconde que metade dele é chute meu: a comissão de 5% está no
+    Decreto 21.981/1932, a taxa administrativa não está em lei nenhuma e há
+    casa que declara só a comissão legal."""
+    partes = {p["parcela"]: p for p in Custos().composicao()}
+    assert partes["comissão do leiloeiro"]["confirmado"] is True
+    assert "21.981" in partes["comissão do leiloeiro"]["base"]
+
+    taxa = partes["taxa administrativa da casa"]
+    assert taxa["confirmado"] is False
+    assert "EDITAL" in taxa["base"]
+    # E ninguém pode ler a lista achando que tudo ali foi medido.
+    assert sum(p["confirmado"] for p in Custos().composicao()) == 1
