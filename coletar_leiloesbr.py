@@ -115,6 +115,12 @@ URL_LOTE = re.compile(r"((?:peca|lote|item)\.asp\?[^\"'>\s]+)", re.IGNORECASE)
 ANCORA_LOTE = re.compile(
     r"(?=<a[^>]+href=[\"'][^\"']*(?:peca|lote|item)\.asp)", re.IGNORECASE)
 
+# O portal chama a ficha do lote de "página da peça", e nela há o botão "Fazer
+# Lance" — descrito no próprio "Como Comprar" do site. É o marcador mais
+# estável de que uma página É uma ficha de lote, porque é o que faz o site
+# funcionar; o nome do arquivo .asp, esse, ainda não foi medido.
+MARCA_DE_LOTE = re.compile(r"\bfazer\s+lance\b", re.IGNORECASE)
+
 _IMAGEM = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
 
 _TAGS = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)

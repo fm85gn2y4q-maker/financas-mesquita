@@ -37,8 +37,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from coletar_leiloesbr import (PADROES, URL_LOTE, analisar_busca, so_texto,
-                               url_de_busca)
+from coletar_leiloesbr import (MARCA_DE_LOTE, PADROES, URL_LOTE, analisar_busca,
+                               so_texto, url_de_busca)
 from leiloes import fontes
 
 CATALOGO = f"{fontes.PORTAL}/catalogo.asp"
@@ -135,6 +135,13 @@ def descobrir(leilao: str | None = None) -> None:
             "codificacao_legivel": "�" not in html[:5000],
             "formatos_de_url": formatos.most_common(15),
             "links_de_lote": len(URL_LOTE.findall(html)),
+            # Se "Fazer Lance" aparece mas URL_LOTE não casa, o nome do .asp da
+            # ficha é outro — e é essa a informação que falta medir.
+            "marcas_fazer_lance": len(MARCA_DE_LOTE.findall(texto)),
+            "hrefs_com_asp_e_id": sorted({
+                h for h in re.findall(r'href\s*=\s*["\']([^"\']*\.asp\?[^"\']+)["\']',
+                                      html, re.IGNORECASE)
+                if re.search(r"=\d{3,}", h)})[:12],
             "lotes_reconhecidos_pela_busca": len(achados_de_busca),
             "primeiro_lote": achados_de_busca[0] if achados_de_busca else None,
             "padroes_de_texto": padroes,

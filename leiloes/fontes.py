@@ -84,6 +84,18 @@ CATEGORIAS_OBSERVADAS: dict[str, tuple[str, ...]] = {
     "filatelia": (
         "Filatelia",
     ),
+    # PRATARIA, e não numismática. São talheres, baixelas e objetos — o portal
+    # trazia 395 peças em "Prata de Lei" quando esta lista foi colhida.
+    #
+    # Ficam declaradas porque quem procura "peça de prata do Império" quase
+    # sempre quer as duas coisas. Mas ATENÇÃO ao alcance deste acervo: a
+    # identificação aqui foi construída para moeda, selo e cédula, que têm
+    # código de catálogo e grau. Baixela não tem nem um nem outro, e vai cair
+    # inteira em `lotes_para_ler`. Coletar não custa; esperar nota, sim.
+    "prataria": (
+        "Prata de Lei",
+        "Pratas",
+    ),
 }
 
 
