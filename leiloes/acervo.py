@@ -433,18 +433,44 @@ class Acervo:
     # -------------------------------------------------------- valor do metal
 
     def _teores(self) -> dict[str, dict[str, dict[str, Any]]]:
+        """Teor por metal e denominação, de duas origens que se somam.
+
+        A primeira é o catálogo ingerido, que traz os apêndices "Pesos das
+        moedas" — 77 linhas na edição AGA de 2020. A segunda é `teores.json`,
+        para o que o catálogo não cobrir e vier de outra fonte sua.
+
+        `teores.json` prevalece quando as duas trazem a mesma chave: quem
+        preencheu à mão o fez sabendo o que o catálogo diz, e teve motivo.
+        """
+        tabelas: dict[str, dict[str, dict[str, Any]]] = {}
+
+        if self.catalogo is not None:
+            tem = self.catalogo.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' "
+                "AND name='teor'").fetchone()
+            if tem:
+                for r in self.catalogo.execute(
+                        "SELECT metal, denominacao_norm, ano_de, ano_ate, teor, "
+                        "fonte FROM teor"):
+                    chave = (f"{r['denominacao_norm']}|{r['ano_de']}-{r['ano_ate']}"
+                             if r["ano_de"] else r["denominacao_norm"])
+                    tabelas.setdefault(r["metal"].lower(), {})[chave] = {
+                        "teor": r["teor"], "fonte": r["fonte"]}
+
         caminho = Path(os.environ.get("TEORES_JSON")
                        or Path(__file__).resolve().parent / "teores.json")
-        if not caminho.exists():
-            return {}
-        dados = json.loads(caminho.read_text(encoding="utf-8"))
-        # Entrada sem fonte declarada NÃO conta. É o que impede um número
-        # colocado "só para testar" de virar base de decisão de compra.
-        return {metal: {chave: v for chave, v in tabela.items()
-                        if not chave.startswith("_") and v.get("fonte")
-                        and v.get("teor")}
-                for metal, tabela in dados.items()
-                if not metal.startswith("_")}
+        if caminho.exists():
+            dados = json.loads(caminho.read_text(encoding="utf-8"))
+            for metal, tabela in dados.items():
+                if metal.startswith("_"):
+                    continue
+                # Entrada sem fonte declarada NÃO conta. É o que impede um
+                # número posto "só para testar" de virar decisão de compra.
+                tabelas.setdefault(metal, {}).update(
+                    {chave: v for chave, v in tabela.items()
+                     if not chave.startswith("_") and v.get("fonte")
+                     and v.get("teor")})
+        return tabelas
 
     def _teor_de(self, tabela: dict[str, dict[str, Any]], denominacao: str,
                  ano: int | None) -> dict[str, Any] | None:

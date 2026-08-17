@@ -96,11 +96,59 @@ CREATE TABLE preco (
 CREATE INDEX ix_moeda_ano ON moeda(ano);
 CREATE INDEX ix_moeda_casamento ON moeda(ano, metal, denominacao_norm);
 
+-- Teor (título) do metal, dos apêndices "Pesos das moedas" da obra.
+--
+-- Fica no banco do catálogo, e não em arquivo do repositório, pelo mesmo
+-- motivo que todo o resto: é conteúdo da obra protegida, e o repositório é
+-- público. Aqui ele nunca sai da máquina de quem tem a cópia.
+CREATE TABLE teor (
+    metal            TEXT NOT NULL,
+    denominacao_norm TEXT NOT NULL,
+    ano_de           INTEGER,
+    ano_ate          INTEGER,
+    peso_g           REAL,
+    teor             REAL NOT NULL,
+    letras           TEXT,
+    fonte            TEXT NOT NULL,
+    PRIMARY KEY (metal, denominacao_norm, ano_de, ano_ate)
+);
+
 CREATE TABLE fonte (
     chave TEXT PRIMARY KEY,
     valor TEXT
 );
 """
+
+# Os apêndices de peso e teor. São TRÊS, com colunas em ordens diferentes:
+#
+#   "Pesos das moedas de ouro brasileiras"   Valor Unid. Datas Letras Peso Teor
+#   "Pesos das moedas de prata - Réis"       Valor Datas Letra Peso Teor
+#   "Pesos das moedas de prata - Pós-1942"   Valor Unid. Datas Peso Teor
+#
+# Por isso a leitura é ANCORADA À DIREITA — teor no fim, peso antes dele, valor
+# no começo, e o que sobra no meio é datas e letras. Casar posição por posição
+# exigiria três expressões e erraria na primeira mudança de layout.
+_APENDICE = re.compile(r"Pesos das moedas de\s+(ouro|prata)", re.IGNORECASE)
+
+# A leitura é feita em três mordidas, da direita para a esquerda, e não numa
+# expressão só. O motivo é medido: a obra escreve peso e teor em FAIXA quando a
+# cunhagem variou —
+#
+#     960    1810 a 1834   R, B e M    De 26,8 a 27,1    .896 a .905
+#     2.000  1922          Sem letra   7.90              .500/.900
+#
+# — e a primeira versão, que exigia um número só em cada campo, pulou essas
+# linhas EM SILÊNCIO. Entre elas estava o 960 réis, que é a prata imperial mais
+# negociada do país. Por isso hoje as faixas são lidas, o MENOR valor é o que
+# vale (menos metal, menos peça entrando por engano) e a linha do apêndice que
+# ainda assim não casar é contada e mostrada, nunca descartada calada.
+_TEOR_FIM = re.compile(r"\.(\d{3})\s*(?:(?:a|/|-|e)\s*\.?(\d{3}))?\s*$")
+_PESO_FIM = re.compile(
+    r"(?:De\s+)?(\d+[.,]\d+)\s*(?:a\s+(\d+[.,]\d+))?\s*g?\s*$", re.IGNORECASE)
+_VALOR_INICIO = re.compile(r"^\s*(\d{1,3}(?:\.\d{3})*)\s+")
+_UNIDADE = re.compile(
+    r"\b(R[ée]is|Florins|Cruz(?:\.|eiros?)(?:\s+Novos?)?|Cruzados?(?:\s+Novos?)?|"
+    r"Reais|Centavos?)\b", re.IGNORECASE)
 
 # "SOB" é como a obra escreve Soberba; o acervo de leilões usa "S". A tradução
 # acontece aqui, uma vez, para que a chave do comparável case.
@@ -144,8 +192,24 @@ def _normalizar(denominacao: str | None) -> str | None:
 
 
 def _numero(texto: str) -> float | None:
+    """Número em formato BRASILEIRO: ponto separa milhar, vírgula separa
+    decimal. É o formato dos PREÇOS da obra — "31.000,00"."""
     try:
         return float(texto.replace(".", "").replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _decimal(texto: str) -> float | None:
+    """Número dos APÊNDICES, onde o separador decimal é o ponto.
+
+    Os dois formatos convivem na mesma obra — preço em "31.000,00" e peso em
+    "7.90" ou "26,8" —, e usar o conversor brasileiro nos dois transformou
+    7,90 g em 790 g: cem vezes mais prata do que a moeda tem. Num acervo cujo
+    piso é o valor do metal, esse é o erro que faria toda peça parecer barata.
+    """
+    try:
+        return float(texto.strip().replace(",", "."))
     except ValueError:
         return None
 
@@ -167,11 +231,66 @@ def ingerir(origem: Path, destino: Path = DESTINO) -> None:
     sem_cabecalho = 0
     tabelas = 0
 
+    apendice: str | None = None
+    teores = 0
+    apendice_perdidas: list[str] = []
+
     for linha in linhas:
         if _RODAPE.search(linha):
             continue
 
+        if (m := _APENDICE.search(linha)):
+            apendice = m.group(1).capitalize()
+            # "Pesos das moedas de prata - Réis" não repete a unidade em cada
+            # linha; as outras duas repetem. O padrão da seção cobre a primeira.
+            unidade_padrao = "réis" if re.search(r"R[ée]is", linha,
+                                                 re.IGNORECASE) else None
+            continue
+
+        if apendice and (fim := _TEOR_FIM.search(linha)):
+            resto = linha[:fim.start()]
+            peso_m = _PESO_FIM.search(resto)
+            valor_m = _VALOR_INICIO.match(resto)
+            if not (peso_m and valor_m):
+                apendice_perdidas.append(linha.rstrip())
+                continue
+
+            meio = resto[valor_m.end():peso_m.start()]
+            anos = [int(a) for a in re.findall(r"\b(1[5-9]\d{2}|20[0-2]\d)\b", meio)]
+            unidade = ((u := _UNIDADE.search(meio)) and u.group(1).lower()) \
+                or unidade_padrao
+            if not unidade:
+                apendice_perdidas.append(linha.rstrip())
+                continue
+            unidade = {"cruz.": "cruzeiros", "cruz. novos": "cruzeiros novos",
+                       "reis": "réis"}.get(unidade, unidade)
+
+            # Faixa: fica o MENOR de cada campo. Menos metal significa menos
+            # valor intrínseco, e portanto menos peça entrando por engano na
+            # peneira de "abaixo do valor do metal" — onde errar para mais
+            # custa dinheiro e errar para menos custa uma oportunidade.
+            teor_min = min(int(g) for g in fim.groups() if g) / 1000
+            teor_max = max(int(g) for g in fim.groups() if g) / 1000
+            peso_min = min(_decimal(g) for g in peso_m.groups() if g)
+            nota = meio.strip() or None
+            if teor_max != teor_min:
+                nota = (f"{nota or ''} [a obra declara teor entre "
+                        f".{int(teor_min * 1000):03d} e .{int(teor_max * 1000):03d}; "
+                        f"vale o menor]").strip()
+
+            con.execute(
+                "INSERT OR REPLACE INTO teor VALUES (?,?,?,?,?,?,?,?)",
+                (apendice, _normalizar(f"{valor_m.group(1)} {unidade}"),
+                 min(anos) if anos else None, max(anos) if anos else None,
+                 peso_min, teor_min, nota,
+                 f"Catálogo AGA, apêndice 'Pesos das moedas de "
+                 f"{apendice.lower()}'"))
+            teores += 1
+            continue
+
         if (m := _CABECALHO.match(linha)):
+            # Começou tabela de verbetes: acabou o apêndice.
+            apendice = None
             graus = [GRAUS[g.upper()] for g in m.groups()]
             tabelas += 1
             continue
@@ -250,6 +369,16 @@ def ingerir(origem: Path, destino: Path = DESTINO) -> None:
     print(f"cotações            {precos:>7}")
     print(f"  só raridade       {raros:>7}  (a obra não arrisca preço)")
     print(f"por grau            {', '.join(f'{g}: {n}' for g, n in por_grau)}")
+    por_metal = con.execute(
+        "SELECT metal, count(*) FROM teor GROUP BY metal ORDER BY 2 DESC").fetchall()
+    print(f"teores (apêndices)  {teores:>7}  "
+          f"({', '.join(f'{m}: {n}' for m, n in por_metal) or 'nenhum'})")
+    if apendice_perdidas:
+        print(f"\n{len(apendice_perdidas)} linhas dos apêndices de peso/teor NÃO "
+              f"foram lidas. Estão abaixo, inteiras, porque teor que some em "
+              f"silêncio vira peça sem conta de metal:")
+        for linha in apendice_perdidas:
+            print(f"  {linha.strip()[:100]}")
     if sem_cabecalho:
         print(f"\n{sem_cabecalho} linhas com forma de verbete foram DESCARTADAS "
               f"por não haver cabeçalho de grau lido antes delas. Não foram "

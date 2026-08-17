@@ -46,6 +46,12 @@ ALEXANDRE GUIMARÃES ALVES     *   alexandregalves8@gmail.com    *   LANÇAMENTO
 
 Núm.    Data               Quantidades Observações                MBC          SOB          FC
  633    1818    R - Quant. 5.157                                 600,00      1.200,00    2.200,00
+
+                  Pesos das moedas de prata - Réis
+Valor        Datas               Letra Monet.             Peso em g            Teor
+80           1695 a   1833       Sem letra, P, R e B      2.24                 .917
+960          1810 a   1834       R, B e M                 De 26,8 a 27,1       .896 a .905
+2.000        1922                Sem letra                7.90                 .500/.900
 """
 
 
@@ -226,3 +232,83 @@ def test_a_release_recusa_publicar_catalogo_junto(tmp_path):
         preparar_release_leiloes.conferir_que_nao_ha_catalogo(banco)
     assert "obra protegida" in str(erro.value)
     assert "moeda" in str(erro.value)
+
+
+# ------------------------------------- apêndices de peso e teor
+
+def _teor(con, denominacao):
+    return con.execute(
+        "SELECT * FROM teor WHERE denominacao_norm = ?", (denominacao,)).fetchone()
+
+
+def test_o_teor_sai_dos_apendices_de_peso(catalogo):
+    """A obra TEM teor — em apêndices próprios, e não na ficha de cada peça.
+    Eu havia afirmado que não tinha, procurando no lugar errado."""
+    linha = _teor(catalogo, "80 réis")
+    assert linha["teor"] == 0.917
+    assert linha["peso_g"] == 2.24
+    assert linha["metal"] == "Prata"
+    assert linha["ano_de"] == 1695 and linha["ano_ate"] == 1833
+    assert "apêndice" in linha["fonte"]
+
+
+def test_faixa_de_teor_e_lida_e_vale_o_menor(catalogo):
+    """A regressão que quase custou a peça mais negociada do Império.
+
+    O 960 réis vem com peso e teor em FAIXA — "De 26,8 a 27,1" e ".896 a .905".
+    A primeira versão exigia um número só em cada campo e pulou a linha em
+    silêncio, deixando justamente a prata imperial mais comum sem teor.
+    """
+    linha = _teor(catalogo, "960 réis")
+    assert linha is not None, "o 960 réis não pode sumir do apêndice"
+    assert linha["teor"] == 0.896        # o menor da faixa
+    assert linha["peso_g"] == 26.8       # idem
+    assert ".896 e .905" in linha["letras"]
+
+
+def test_o_separador_decimal_do_apendice_e_o_ponto(catalogo):
+    """Os dois formatos convivem na obra: preço em "31.000,00" e peso em
+    "7.90". Usar o conversor brasileiro nos dois transformava 7,90 g em 790 g —
+    cem vezes mais prata do que a moeda tem, num acervo cujo piso é o metal."""
+    assert _teor(catalogo, "2000 réis")["peso_g"] == 7.90
+    assert _teor(catalogo, "80 réis")["peso_g"] == 2.24
+
+
+def test_teor_barrado_tambem_e_faixa(catalogo):
+    """".500/.900" é faixa escrita com barra, e vale o menor pelo mesmo motivo."""
+    assert _teor(catalogo, "2000 réis")["teor"] == 0.500
+
+
+def test_o_acervo_le_o_teor_do_catalogo_sem_arquivo_nenhum(tmp_path, monkeypatch):
+    """Com catálogo ingerido, `teores.json` deixa de ser obrigatório."""
+    import json
+
+    import construir_leiloes
+    from leiloes.acervo import Acervo
+
+    dados = tmp_path / "dados"
+    dados.mkdir()
+    origem = tmp_path / "aga.txt"
+    origem.write_text(CATALOGO, encoding="utf-8")
+    ingerir(origem, dados / "catalogo.db")
+
+    brutos = tmp_path / "dados_brutos" / "leiloesbr"
+    brutos.mkdir(parents=True)
+    monkeypatch.setattr(construir_leiloes, "BRUTOS", brutos)
+    monkeypatch.setattr(construir_leiloes, "DESTINO", dados / "leiloes.db")
+    monkeypatch.delenv("CATALOGO_DB", raising=False)
+    monkeypatch.delenv("TEORES_JSON", raising=False)
+    (brutos / "leilao-1.json").write_text(json.dumps({
+        "leilao": {"id": "1", "casa": "Casa", "data_pregao": "2026-09-01",
+                   "url": "http://x", "uf": "RJ"},
+        "lotes": [{"numero": 1, "titulo": "Moeda 960 Réis 1820 prata MBC",
+                   "situacao": "aberto", "lance_inicial": 100.0, "lances": 0}],
+        "coletado_em": "2026-08-16T12:00:00+00:00"}, ensure_ascii=False),
+        encoding="utf-8")
+    construir_leiloes.construir()
+
+    acervo = Acervo(dados / "leiloes.db")
+    tabela = acervo._teores()
+    assert acervo._teor_de(tabela["prata"], "960 réis", 1820)["teor"] == 0.896
+    # E fora da faixa de datas, não vale.
+    assert acervo._teor_de(tabela["prata"], "960 réis", 1900) is None
