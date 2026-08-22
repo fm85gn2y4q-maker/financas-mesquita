@@ -1,8 +1,5 @@
 {
- "quando": "2026-08-14T10:33:10-03:00",
- "resultado": "publicado",
- "detalhe": "v2026.08.14",
- "relatorio_linha": 417006,
- "relatorios": 25,
- "siconfi_linha": 126466
+ "quando": "2026-08-22T15:26:16-03:00",
+ "resultado": "falha",
+ "detalhe": "PNCP:   File \"C:\\Users\\Matheus Menegatti\\projetos\\financas-mesquita\\fontes.py\", line 62, in baixar /     raise RuntimeError(f\"falhou ap�s {tentativas} tentativas: {url}\") from ultimo_erro / RuntimeError: falhou ap�s 4 tentativas: https://pncp.gov.br/api/search/?tipos_documento=edital&ordenacao=-data&status=todos&municipios=3218&pagina=1&tam_pagina=50"
 }
