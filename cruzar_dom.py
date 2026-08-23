@@ -35,13 +35,35 @@ Uso:  python cruzar_dom.py
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
-DOM = Path(r"C:\Users\Matheus Menegatti\Mesquita_Diarios_Oficiais\acervo.db")
+def _banco_do_dom() -> Path:
+    """O acervo do Diário mudou de disco em 23/08/2026 — e este caminho era fixo.
+
+    Estava escrito com a letra `C:` e o nome do usuário dentro, sem alternativa:
+    mover a pasta para o HD externo quebraria este script em silêncio, na
+    primeira execução depois da mudança. Segue a mesma ordem que o servidor do
+    `diarios-mesquita` já usa — variável de ambiente, HD externo, casa.
+    """
+    do_ambiente = os.environ.get("DIARIOS_BANCO")
+    candidatos = ([Path(do_ambiente)] if do_ambiente else []) + [
+        Path("D:/Mesquita_Diarios_Oficiais/acervo.db"),
+        Path.home() / "Mesquita_Diarios_Oficiais" / "acervo.db",
+    ]
+    for caminho in candidatos:
+        if caminho.exists():
+            return caminho
+    # Nenhum existe: devolve o primeiro para a mensagem de erro citar um
+    # caminho concreto, em vez de falhar com `None`.
+    return candidatos[0]
+
+
+DOM = _banco_do_dom()
 ACERVO = Path(__file__).resolve().parent / "dados" / "acervo.db"
 
 # Primeiro exercício em que a divulgação no PNCP é exigível de todo contrato.
