@@ -1,5 +1,5 @@
 {
- "quando": "2026-08-22T15:26:16-03:00",
- "resultado": "falha",
- "detalhe": "PNCP:   File \"C:\\Users\\Matheus Menegatti\\projetos\\financas-mesquita\\fontes.py\", line 62, in baixar /     raise RuntimeError(f\"falhou ap�s {tentativas} tentativas: {url}\") from ultimo_erro / RuntimeError: falhou ap�s 4 tentativas: https://pncp.gov.br/api/search/?tipos_documento=edital&ordenacao=-data&status=todos&municipios=3218&pagina=1&tam_pagina=50"
+ "quando": "2026-08-30T16:59:42-03:00",
+ "resultado": "iniciado",
+ "detalhe": "coleta em andamento"
 }
