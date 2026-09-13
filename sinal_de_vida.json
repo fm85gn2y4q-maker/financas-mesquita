@@ -1,5 +1,5 @@
 {
- "quando": "2026-09-13T09:00:02-03:00",
- "resultado": "iniciado",
- "detalhe": "coleta em andamento"
+ "quando": "2026-09-13T13:17:19-03:00",
+ "resultado": "falha",
+ "detalhe": "testes: =========================== short test summary info =========================== / FAILED tests/test_relatorios.py::test_derivados_apontam_a_posicao - Assertion... / 1 failed, 21 passed in 532.07s (0:08:52)"
 }
