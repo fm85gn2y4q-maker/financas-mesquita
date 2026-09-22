@@ -159,6 +159,16 @@ def main(argv: list[str] | None = None) -> int:
     anotar("=" * 60)
     anotar(f"atualização semanal{' (ENSAIO)' if ensaio else ''}")
 
+    # Sinal de PARTIDA, antes de qualquer coisa demorada.
+    #
+    # Medido em 22/08/2026: a execução de 16/08 foi morta no meio da coleta
+    # (LastTaskResult 3221225786 = STATUS_CONTROL_C_EXIT, logoff ou
+    # desligamento) e não deixou rastro nenhum — o sinal seguiu marcando o
+    # sucesso de 14/08, e só o envelhecimento dele denunciaria, oito dias
+    # depois. Registrar a partida separa "nunca rodou" de "rodou e morreu no
+    # caminho", que pedem providências diferentes.
+    gravar_sinal("iniciado", "coleta em andamento", ensaio=ensaio)
+
     for nome, comando in PASSOS_COLETA:
         anotar(f"coletando: {nome}…")
         codigo, saida = rodar(comando)
